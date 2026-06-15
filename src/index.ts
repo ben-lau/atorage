@@ -1,4 +1,5 @@
 export { atom } from './atom.js'
+export { batch } from './batch.js'
 export { defineAtom } from './define-atom.js'
 export { createScope } from './scope.js'
 export {
@@ -18,7 +19,6 @@ export type {
   AtomErrorEventDetail,
   Driver,
   BatchOp,
-  StorageUsage,
   Middleware,
   MiddlewareFunction,
   MiddlewareWithHooks,
@@ -26,3 +26,6 @@ export type {
   MiddlewareNext,
   Scope,
 } from './types.js'
+
+export { snapshot, restore, clearByPrefix } from './utils/index.js'
+export type { SnapshotOptions, RestoreOptions, ClearByPrefixOptions } from './utils/index.js'

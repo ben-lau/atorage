@@ -1,4 +1,4 @@
-import type { BatchOp, Driver, StorageUsage } from '../types.js'
+import type { BatchOp, Driver } from '../types.js'
 
 export function memoryDriver(): Driver {
   const store = new Map<string, unknown>()
@@ -46,10 +46,6 @@ export function memoryDriver(): Driver {
         }
       }
       return Promise.resolve()
-    },
-
-    usage(): Promise<StorageUsage> {
-      return Promise.resolve({ used: store.size })
     },
   }
 }

@@ -42,19 +42,11 @@ describe('atom', () => {
       a.dispose()
     })
 
-    it('get with defaultValue returns defaultValue when empty', async () => {
+    it('get returns undefined when empty, user applies ?? for default', async () => {
       const a = atom('empty', withDriver(memoryDriver()))
 
-      await expect(a.get('fallback')).resolves.toBe('fallback')
-
-      a.dispose()
-    })
-
-    it('get with defaultValue returns stored value when exists', async () => {
-      const a = atom('foo', withDriver(memoryDriver()))
-
-      await a.set('stored')
-      await expect(a.get('fallback')).resolves.toBe('stored')
+      const val = (await a.get()) ?? 'fallback'
+      expect(val).toBe('fallback')
 
       a.dispose()
     })
@@ -266,11 +258,11 @@ describe('atom', () => {
   describe('requestWriteback', () => {
     it('middleware calls requestWriteback during get → triggers automatic set', async () => {
       const writebackMw: MiddlewareFunction = async (ctx, next) => {
+        await next()
         if (ctx.operation === 'get') {
           ctx.value = 'computed'
           ctx.requestWriteback()
         }
-        await next()
       }
       const driver = memoryDriver()
       const a = atom<string>('key', withDriver(driver), withMiddleware(writebackMw))
@@ -455,7 +447,7 @@ describe('atom', () => {
       await a.set(1)
       a.dispose()
 
-      expect(() => a.get()).toThrow(AtomDisposedError)
+      await expect(a.get()).rejects.toThrow(AtomDisposedError)
       await expect(a.set(2)).rejects.toThrow(AtomDisposedError)
       await expect(a.del()).rejects.toThrow(AtomDisposedError)
       await expect(a.has()).rejects.toThrow(AtomDisposedError)

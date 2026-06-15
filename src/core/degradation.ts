@@ -7,7 +7,7 @@ export async function degradedGet(
 ): Promise<unknown> {
   for (const driver of drivers) {
     const stored = await driver.get(key)
-    if (stored !== undefined && stored !== null) {
+    if (stored !== undefined) {
       return stored
     }
   }
@@ -43,17 +43,4 @@ export async function degradedDel(
   for (const driver of drivers) {
     await driver.del(key).catch(() => {})
   }
-}
-
-export async function degradedHas(
-  drivers: Driver[],
-  key: string,
-): Promise<boolean> {
-  for (const driver of drivers) {
-    const stored = await driver.get(key)
-    if (stored !== undefined && stored !== null) {
-      return true
-    }
-  }
-  return false
 }

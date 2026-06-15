@@ -1,1 +1,3 @@
-// Phase 4: debug utilities will be exported here
+export { raw } from './raw.js'
+export { inspect } from './inspect.js'
+export type { InspectResult } from './inspect.js'

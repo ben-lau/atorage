@@ -1,4 +1,4 @@
-import { degradedGet, degradedSet, degradedDel, degradedHas } from '../../src/core/degradation'
+import { degradedGet, degradedSet, degradedDel } from '../../src/core/degradation'
 import { memoryDriver } from '../../src/drivers/memory'
 import { StorageError } from '../../src/errors'
 import type { Driver } from '../../src/types'
@@ -105,23 +105,12 @@ describe('degradedDel', () => {
   })
 })
 
-describe('degradedHas', () => {
-  it('returns true when value exists', async () => {
-    const driver1 = memoryDriver()
-    const driver2 = memoryDriver()
-    await driver2.set('key', 'value')
+describe('degradedGet null handling', () => {
+  it('treats null as a valid value', async () => {
+    const driver = memoryDriver()
+    await driver.set('key', null)
 
-    const result = await degradedHas([driver1, driver2], 'key')
-
-    expect(result).toBe(true)
-  })
-
-  it('returns false when no driver has the key', async () => {
-    const driver1 = memoryDriver()
-    const driver2 = memoryDriver()
-
-    const result = await degradedHas([driver1, driver2], 'missing')
-
-    expect(result).toBe(false)
+    const result = await degradedGet([driver], 'key')
+    expect(result).toBeNull()
   })
 })

@@ -6,11 +6,6 @@ export interface BatchOp {
   value?: unknown
 }
 
-export interface StorageUsage {
-  used: number
-  quota?: number
-}
-
 export interface Driver {
   name: string
 
@@ -23,7 +18,6 @@ export interface Driver {
 
   available?(): Promise<boolean> | boolean
   batch?(ops: BatchOp[]): Promise<void>
-  usage?(): Promise<StorageUsage>
 }
 
 // ── Middleware ───────────────────────────────────────
@@ -34,6 +28,8 @@ export interface MiddlewareContext<T = unknown> {
   value?: T
   meta: Record<string, unknown>
   requestWriteback(): void
+  requestDelete(): void
+  reportError(error: Error): void
 }
 
 export type MiddlewareNext = () => Promise<void>
@@ -45,6 +41,7 @@ export type MiddlewareFunction = (
 
 export interface MiddlewareWithHooks {
   handle: MiddlewareFunction
+  onInit?(context: { key: string; atomId: string }): void
   onExternalChange?(): void
   onDispose?(): void
 }
@@ -64,7 +61,6 @@ export interface Atom<T> extends EventTarget {
   readonly key: string
 
   get(): Promise<T | undefined>
-  get(defaultValue: T): Promise<T>
   set(value: T): Promise<void>
   del(): Promise<T | undefined>
   has(): Promise<boolean>
@@ -72,7 +68,6 @@ export interface Atom<T> extends EventTarget {
 
   getMeta(): Promise<Record<string, unknown> | undefined>
 
-  refresh(): Promise<T | undefined>
   dispose(): void
 }
 

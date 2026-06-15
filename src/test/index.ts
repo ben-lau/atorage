@@ -1,1 +1,1 @@
-// Phase 4: test utilities will be exported here
+export { testDriver } from './test-driver.js'

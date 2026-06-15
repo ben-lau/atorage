@@ -1,26 +1,36 @@
-import { memoryDriver } from '../../src/drivers/memory'
+// @vitest-environment happy-dom
+import { sessionStorageDriver } from '../../src/drivers/session-storage'
 
-describe('memoryDriver', () => {
+describe('sessionStorageDriver', () => {
+  beforeEach(() => window.sessionStorage.clear())
+
+  it('available() returns true', () => {
+    const driver = sessionStorageDriver()
+    expect(driver.available!()).toBe(true)
+  })
+
   it('set then get returns the value', async () => {
-    const driver = memoryDriver()
+    const driver = sessionStorageDriver()
     await driver.set('foo', 'bar')
     expect(await driver.get('foo')).toBe('bar')
+    await driver.set('num', 42)
+    expect(await driver.get('num')).toBe(42)
   })
 
   it('get non-existent key returns undefined', async () => {
-    const driver = memoryDriver()
+    const driver = sessionStorageDriver()
     expect(await driver.get('missing')).toBeUndefined()
   })
 
-  it('has returns true/false correctly', async () => {
-    const driver = memoryDriver()
+  it('has returns true/false', async () => {
+    const driver = sessionStorageDriver()
     expect(await driver.has('foo')).toBe(false)
     await driver.set('foo', 1)
     expect(await driver.has('foo')).toBe(true)
   })
 
   it('del removes the value', async () => {
-    const driver = memoryDriver()
+    const driver = sessionStorageDriver()
     await driver.set('foo', 'bar')
     await driver.del('foo')
     expect(await driver.get('foo')).toBeUndefined()
@@ -28,7 +38,7 @@ describe('memoryDriver', () => {
   })
 
   it('keys returns all keys', async () => {
-    const driver = memoryDriver()
+    const driver = sessionStorageDriver()
     await driver.set('a', 1)
     await driver.set('b', 2)
     await driver.set('c', 3)
@@ -37,7 +47,7 @@ describe('memoryDriver', () => {
   })
 
   it('keys with prefix filters correctly', async () => {
-    const driver = memoryDriver()
+    const driver = sessionStorageDriver()
     await driver.set('user:1', 'alice')
     await driver.set('user:2', 'bob')
     await driver.set('post:1', 'hello')
@@ -45,32 +55,14 @@ describe('memoryDriver', () => {
     expect((await driver.keys('user:')).length).toBe(2)
   })
 
-  it('batch applies multiple operations', async () => {
-    const driver = memoryDriver()
-    await driver.batch!([
-      { type: 'set', key: 'a', value: 1 },
-      { type: 'set', key: 'b', value: 2 },
-      { type: 'del', key: 'a' },
-    ])
-    expect(await driver.get('a')).toBeUndefined()
-    expect(await driver.get('b')).toBe(2)
-  })
-
-  it('dispose clears all data', async () => {
-    const driver = memoryDriver()
-    await driver.set('foo', 'bar')
-    await driver.dispose()
-    expect(await driver.get('foo')).toBeUndefined()
-    expect(await driver.keys()).toEqual([])
-  })
-
-  it('works with complex objects', async () => {
-    const driver = memoryDriver()
+  it('complex objects round-trip correctly', async () => {
+    const driver = sessionStorageDriver()
     const value = {
-      nested: { arr: [1, 2, 3], date: new Date('2024-01-01') },
-      fn: () => 'hello',
+      nested: { arr: [1, 2, 3], flag: true },
+      list: ['a', 'b', { c: 4 }],
     }
     await driver.set('complex', value)
-    expect(await driver.get('complex')).toBe(value)
+    expect(await driver.get('complex')).toEqual(value)
   })
+
 })
