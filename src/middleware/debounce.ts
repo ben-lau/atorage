@@ -84,7 +84,7 @@ export function debounce(ms: number): DebounceMiddleware {
   return {
     handle,
     flush: doFlush,
-    onExternalChange() {
+    onExternalChange(_key: string) {
       clearPending()
     },
     onDispose() {

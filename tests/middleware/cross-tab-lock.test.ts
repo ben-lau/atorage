@@ -10,9 +10,10 @@ beforeEach(() => {
   lockCalls = []
   Object.defineProperty(navigator, 'locks', {
     value: {
-      request: async (name: string, callback: () => Promise<void>) => {
+      request: async (name: string, opts: any, callback?: () => Promise<void>) => {
         lockCalls.push(name)
-        await callback()
+        const fn = typeof opts === 'function' ? opts : callback!
+        await fn()
       },
     },
     configurable: true,

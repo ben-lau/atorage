@@ -69,9 +69,9 @@ describe('error events', () => {
       errors.push(e.detail.error)
     }) as EventListener)
 
-    await expect(a.get()).rejects.toThrow('get failed')
+    await expect(a.get()).rejects.toThrow('All drivers failed on get')
     expect(errors).toHaveLength(1)
-    expect(errors[0].message).toBe('get failed')
+    expect(errors[0].message).toBe('All drivers failed on get')
 
     a.dispose()
   })

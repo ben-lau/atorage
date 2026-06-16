@@ -73,7 +73,7 @@ describe('cached middleware', () => {
     await expect(a.get()).resolves.toBe('stored')
     expect(driver.getCount()).toBe(1)
 
-    cacheMw.onExternalChange!()
+    cacheMw.onExternalChange!(a.key)
 
     await expect(a.get()).resolves.toBe('stored')
     expect(driver.getCount()).toBe(2)

@@ -53,13 +53,29 @@ export async function batch(fn: () => Promise<void> | void): Promise<void> {
     const busNotify = currentBatch.deferredBusNotify
     currentBatch = null
 
-    for (const [, { atom, event }] of events) {
-      atom.dispatchEvent(event)
-    }
+    const dispatchErrors: Error[] = []
 
     for (const [key, { sourceAtomId, event }] of busNotify) {
-      const atomKey = key.substring(sourceAtomId.length + 1)
-      eventBus.notify(atomKey, sourceAtomId, event)
+      try {
+        const atomKey = key.substring(sourceAtomId.length + 1)
+        eventBus.notify(atomKey, sourceAtomId, event)
+      } catch (err) {
+        dispatchErrors.push(err instanceof Error ? err : new Error(String(err)))
+      }
+    }
+
+    for (const [, { atom, event }] of events) {
+      try {
+        atom.dispatchEvent(event)
+      } catch (err) {
+        dispatchErrors.push(err instanceof Error ? err : new Error(String(err)))
+      }
+    }
+
+    if (dispatchErrors.length > 0) {
+      throw dispatchErrors.length === 1
+        ? dispatchErrors[0]
+        : new AggregateError(dispatchErrors, 'Errors during batch event dispatch')
     }
   }
 }

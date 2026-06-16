@@ -294,7 +294,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
   private _callExternalChangeHooks(): void {
     for (const mw of this._middleware) {
       if (isMiddlewareWithHooks(mw) && mw.onExternalChange) {
-        mw.onExternalChange()
+        mw.onExternalChange(this.key)
       }
     }
   }

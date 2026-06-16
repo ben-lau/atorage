@@ -4,37 +4,43 @@ export interface CachedMiddleware extends MiddlewareWithHooks {
   clear(): void
 }
 
+interface CacheEntry {
+  value: unknown
+  meta: Record<string, unknown>
+}
+
 export function cached(): CachedMiddleware {
-  let cache: { value: unknown; meta: Record<string, unknown> } | null = null
+  const caches = new Map<string, CacheEntry>()
 
   const handle: MiddlewareFunction = async (ctx, next) => {
-    if (ctx.operation === 'get' && cache !== null) {
-      ctx.value = cache.value
-      Object.assign(ctx.meta, cache.meta)
+    if (ctx.operation === 'get' && caches.has(ctx.key)) {
+      const entry = caches.get(ctx.key)!
+      ctx.value = entry.value
+      Object.assign(ctx.meta, entry.meta)
       return
     }
 
     await next()
 
     if (ctx.operation === 'get') {
-      cache = { value: ctx.value, meta: { ...ctx.meta } }
+      caches.set(ctx.key, { value: ctx.value, meta: { ...ctx.meta } })
     } else if (ctx.operation === 'set') {
-      cache = { value: ctx.value, meta: { ...ctx.meta } }
+      caches.set(ctx.key, { value: ctx.value, meta: { ...ctx.meta } })
     } else if (ctx.operation === 'del') {
-      cache = null
+      caches.delete(ctx.key)
     }
   }
 
   return {
     handle,
     clear() {
-      cache = null
+      caches.clear()
     },
-    onExternalChange() {
-      cache = null
+    onExternalChange(key: string) {
+      caches.delete(key)
     },
     onDispose() {
-      cache = null
+      caches.clear()
     },
   }
 }

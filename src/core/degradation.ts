@@ -5,11 +5,19 @@ export async function degradedGet(
   drivers: Driver[],
   key: string,
 ): Promise<unknown> {
+  const errors: Error[] = []
   for (const driver of drivers) {
-    const stored = await driver.get(key)
-    if (stored !== undefined) {
-      return stored
+    try {
+      const stored = await driver.get(key)
+      if (stored !== undefined) {
+        return stored
+      }
+    } catch (err) {
+      errors.push(err instanceof Error ? err : new Error(String(err)))
     }
+  }
+  if (errors.length > 0 && errors.length === drivers.length) {
+    throw new StorageError('All drivers failed on get', errors)
   }
   return undefined
 }

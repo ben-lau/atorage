@@ -8,7 +8,16 @@ export async function restore(
   data: Record<string, unknown>,
   options: RestoreOptions,
 ): Promise<void> {
-  for (const [key, value] of Object.entries(data)) {
-    await options.driver.set(key, value)
+  const entries = Object.entries(data)
+  if (entries.length === 0) return
+
+  if (options.driver.batch) {
+    await options.driver.batch(
+      entries.map(([key, value]) => ({ type: 'set', key, value })),
+    )
+  } else {
+    for (const [key, value] of entries) {
+      await options.driver.set(key, value)
+    }
   }
 }
