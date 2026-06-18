@@ -1,0 +1,18 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      glob: '*.{ts,tsx,js,jsx}'
+      exclude: 'dist|node_modules|coverage'
+      run: pnpm exec oxlint --fix {staged_files}
+      stage_fixed: true
+    format:
+      glob: '*.{ts,tsx,js,jsx,json}'
+      exclude: 'dist|node_modules|coverage|pnpm-lock.yaml'
+      run: pnpm exec oxfmt --write {staged_files}
+      stage_fixed: true
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}

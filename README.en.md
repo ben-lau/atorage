@@ -25,15 +25,15 @@ pnpm add atorage
 ## Quick Start
 
 ```typescript
-import { atom, withDriver } from 'atorage'
-import { localStorageDriver } from 'atorage/drivers'
+import { atom, withDriver } from 'atorage';
+import { localStorageDriver } from 'atorage/drivers';
 
-const token = atom<string>('auth-token', withDriver(localStorageDriver()))
+const token = atom<string>('auth-token', withDriver(localStorageDriver()));
 
-await token.set('abc123')
-console.log(await token.get())  // 'abc123'
-console.log(await token.has())  // true
-await token.del()               // returns 'abc123'
+await token.set('abc123');
+console.log(await token.get()); // 'abc123'
+console.log(await token.has()); // true
+await token.del(); // returns 'abc123'
 ```
 
 ## Table of Contents
@@ -80,41 +80,42 @@ An Atom is the core abstraction — an independent storage unit bound to a uniqu
 
 ```typescript
 interface Atom<T> extends EventTarget {
-  readonly key: string
+  readonly key: string;
 
-  get(): Promise<T | undefined>
-  set(value: T): Promise<void>
-  del(): Promise<T | undefined>
-  has(): Promise<boolean>
-  update(updater: (prev: T | undefined) => T | Promise<T>): Promise<T>
-  getMeta(): Promise<Record<string, unknown> | undefined>
-  dispose(): void
+  get(): Promise<T | undefined>;
+  set(value: T): Promise<void>;
+  del(): Promise<T | undefined>;
+  has(): Promise<boolean>;
+  update(updater: (prev: T | undefined) => T | Promise<T>): Promise<T>;
+  getMeta(): Promise<Record<string, unknown> | undefined>;
+  dispose(): void;
 }
 ```
 
-| Method | Description |
-|--------|-------------|
-| `get()` | Read from driver through the middleware chain. No caching by default; enable `cached()` for in-memory caching |
-| `set(value)` | Write to driver through the middleware chain. Dispatches `change` event on success |
-| `del()` | Delete value and associated metadata, returns the deleted value. Internally calls `get()` first |
-| `has()` | Check if value exists. Runs through the full middleware chain — TTL-expired keys return `false` |
-| `update(fn)` | Atomic read-modify-write. Internal serial queue ensures concurrency safety. Supports async updaters |
-| `getMeta()` | Read persisted metadata (TTL expiry, version number, etc.). Read-only, for debugging |
-| `dispose()` | Destroy the atom, clean up all subscriptions and resources. Subsequent operations throw `AtomDisposedError` |
+| Method       | Description                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `get()`      | Read from driver through the middleware chain. No caching by default; enable `cached()` for in-memory caching |
+| `set(value)` | Write to driver through the middleware chain. Dispatches `change` event on success                            |
+| `del()`      | Delete value and associated metadata, returns the deleted value. Internally calls `get()` first               |
+| `has()`      | Check if value exists. Runs through the full middleware chain — TTL-expired keys return `false`               |
+| `update(fn)` | Atomic read-modify-write. Internal serial queue ensures concurrency safety. Supports async updaters           |
+| `getMeta()`  | Read persisted metadata (TTL expiry, version number, etc.). Read-only, for debugging                          |
+| `dispose()`  | Destroy the atom, clean up all subscriptions and resources. Subsequent operations throw `AtomDisposedError`   |
 
 ### Modifiers
 
 Modifiers are pure functions that configure an atom's drivers, scopes, and middleware:
 
 ```typescript
-import { atom, withDriver, withScope, withMiddleware, withPreMiddleware } from 'atorage'
+import { atom, withDriver, withScope, withMiddleware, withPreMiddleware } from 'atorage';
 
-const a = atom<string>('key',
-  withDriver(driver),                  // Specify storage backend (arrays = degradation chain)
-  withScope(scope1, scope2),           // Specify scopes, determines key prefix
+const a = atom<string>(
+  'key',
+  withDriver(driver), // Specify storage backend (arrays = degradation chain)
+  withScope(scope1, scope2), // Specify scopes, determines key prefix
   withMiddleware(ttl(1000), cached()), // Middleware chain (appended)
-  withPreMiddleware(validate(fn)),     // Middleware chain (prepended before base)
-)
+  withPreMiddleware(validate(fn)), // Middleware chain (prepended before base)
+);
 ```
 
 ### defineAtom — Preconfigured Factory
@@ -122,20 +123,21 @@ const a = atom<string>('key',
 Share configuration across a group of atoms:
 
 ```typescript
-import { defineAtom, withDriver, withMiddleware } from 'atorage'
-import { localStorageDriver } from 'atorage/drivers'
-import { encrypt } from 'atorage/middleware'
+import { defineAtom, withDriver, withMiddleware } from 'atorage';
+import { localStorageDriver } from 'atorage/drivers';
+import { encrypt } from 'atorage/middleware';
 
 const secureAtom = defineAtom(
   withDriver(localStorageDriver()),
   withMiddleware(encrypt({ encrypt: myEncrypt, decrypt: myDecrypt })),
-)
+);
 
-const token = secureAtom<string>('token')
-const refresh = secureAtom<string>('refresh',
-  withPreMiddleware(validate(schema)),  // Runs before encrypt
-  withMiddleware(logger()),             // Runs after encrypt
-)
+const token = secureAtom<string>('token');
+const refresh = secureAtom<string>(
+  'refresh',
+  withPreMiddleware(validate(schema)), // Runs before encrypt
+  withMiddleware(logger()), // Runs after encrypt
+);
 // token   chain: encrypt → driver
 // refresh chain: validate → encrypt → logger → driver
 ```
@@ -150,26 +152,27 @@ import {
   localStorageDriver,
   sessionStorageDriver,
   indexedDBDriver,
-} from 'atorage/drivers'
+} from 'atorage/drivers';
 ```
 
-| Driver | Storage | Serialization | batch | Best For |
-|--------|---------|---------------|-------|----------|
-| `memoryDriver()` | In-memory Map | None | ✓ | Testing, SSR, ephemeral data |
-| `localStorageDriver()` | localStorage | JSON | — | Small persistent data |
-| `sessionStorageDriver()` | sessionStorage | JSON | — | Tab-scoped session data |
-| `indexedDBDriver(opts?)` | IndexedDB | Structured clone | ✓ | Large data, Blob/File |
+| Driver                   | Storage        | Serialization    | batch | Best For                     |
+| ------------------------ | -------------- | ---------------- | ----- | ---------------------------- |
+| `memoryDriver()`         | In-memory Map  | None             | ✓     | Testing, SSR, ephemeral data |
+| `localStorageDriver()`   | localStorage   | JSON             | —     | Small persistent data        |
+| `sessionStorageDriver()` | sessionStorage | JSON             | —     | Tab-scoped session data      |
+| `indexedDBDriver(opts?)` | IndexedDB      | Structured clone | ✓     | Large data, Blob/File        |
 
 `indexedDBDriver` options:
 
 ```typescript
 interface IndexedDBDriverOptions {
-  dbName?: string    // Default: 'atorage'
-  storeName?: string // Default: 'kv'
+  dbName?: string; // Default: 'atorage'
+  storeName?: string; // Default: 'kv'
 }
 ```
 
 **Driver interface** — All drivers accept `unknown` values and handle serialization internally:
+
 - localStorage / sessionStorage: Auto `JSON.stringify` / `JSON.parse`
 - IndexedDB: Native structured clone, can store `File`, `Blob`, `ArrayBuffer` directly
 - memory: Stores references as-is
@@ -179,12 +182,14 @@ interface IndexedDBDriverOptions {
 Pass a driver array to form a degradation chain:
 
 ```typescript
-const data = atom('user-prefs',
-  withDriver([localStorageDriver(), indexedDBDriver(), memoryDriver()])
-)
+const data = atom(
+  'user-prefs',
+  withDriver([localStorageDriver(), indexedDBDriver(), memoryDriver()]),
+);
 ```
 
 **Degradation behavior:**
+
 - **Initialization**: Each driver's `available()` filters unsupported drivers (e.g., no localStorage in Node.js)
 - **Write**: Tries each driver in order; the first successful one stores data, and stale copies in other drivers are cleaned up
 - **Read**: Tries each in order; returns the first non-`undefined` result
@@ -197,20 +202,37 @@ Core guarantee: a key exists in exactly one driver at steady state. When a highe
 Implement the `Driver` interface:
 
 ```typescript
-import type { Driver } from 'atorage'
+import type { Driver } from 'atorage';
 
 function redisDriver(url: string): Driver {
-  const client = createClient({ url })
-  const connected = client.connect()
+  const client = createClient({ url });
+  const connected = client.connect();
   return {
     name: 'redis',
-    async get(key) { await connected; return client.get(key) },
-    async set(key, value) { await connected; await client.set(key, JSON.stringify(value)) },
-    async del(key) { await connected; await client.del(key) },
-    async has(key) { await connected; return (await client.exists(key)) > 0 },
-    async keys(prefix) { await connected; return client.keys(prefix ? `${prefix}*` : '*') },
-    async dispose() { await client.quit() },
-  }
+    async get(key) {
+      await connected;
+      return client.get(key);
+    },
+    async set(key, value) {
+      await connected;
+      await client.set(key, JSON.stringify(value));
+    },
+    async del(key) {
+      await connected;
+      await client.del(key);
+    },
+    async has(key) {
+      await connected;
+      return (await client.exists(key)) > 0;
+    },
+    async keys(prefix) {
+      await connected;
+      return client.keys(prefix ? `${prefix}*` : '*');
+    },
+    async dispose() {
+      await client.quit();
+    },
+  };
 }
 ```
 
@@ -221,21 +243,35 @@ Optional methods: `available()` (environment detection) and `batch(ops)` (batch 
 Middleware uses the onion model — modify `ctx.value` before `next()` to affect downstream, after `next()` to affect the upstream return value.
 
 ```typescript
-import { withMiddleware } from 'atorage'
-import { ttl, validate, versioned, cached, debounce, lock, logger, tabSync, compress, encrypt, crossTabLock } from 'atorage/middleware'
+import { withMiddleware } from 'atorage';
+import {
+  ttl,
+  validate,
+  versioned,
+  cached,
+  debounce,
+  lock,
+  logger,
+  tabSync,
+  compress,
+  encrypt,
+  crossTabLock,
+} from 'atorage/middleware';
 ```
 
 ### ttl — Time-to-Live
 
 ```typescript
-const session = atom('session', withDriver(d), withMiddleware(
-  ttl(30 * 60 * 1000)  // 30 minutes
-))
+const session = atom(
+  'session',
+  withDriver(d),
+  withMiddleware(
+    ttl(30 * 60 * 1000), // 30 minutes
+  ),
+);
 
 // Enable active deletion of expired data from driver
-const temp = atom('temp', withDriver(d), withMiddleware(
-  ttl(5000, { deleteOnExpire: true })
-))
+const temp = atom('temp', withDriver(d), withMiddleware(ttl(5000, { deleteOnExpire: true })));
 ```
 
 - **Write**: Records `exp` (expiry timestamp) in meta
@@ -246,11 +282,13 @@ const temp = atom('temp', withDriver(d), withMiddleware(
 ### validate — Runtime Validation
 
 ```typescript
-const age = atom<number>('age', withDriver(d), withMiddleware(
-  validate(v => typeof v === 'number' && v >= 0 && v <= 150)
-))
+const age = atom<number>(
+  'age',
+  withDriver(d),
+  withMiddleware(validate((v) => typeof v === 'number' && v >= 0 && v <= 150)),
+);
 
-await age.set(-1)  // throws ValidationError
+await age.set(-1); // throws ValidationError
 ```
 
 - **Write**: Throws `ValidationError` on validation failure, preventing the write
@@ -259,16 +297,20 @@ await age.set(-1)  // throws ValidationError
 ### versioned — Version Migration
 
 ```typescript
-const prefs = atom('prefs', withDriver(d), withMiddleware(
-  versioned({
-    current: 3,
-    migrate: {
-      0: data => ({ ...data, theme: 'light' }),
-      1: data => ({ ...data, locale: 'en' }),
-      2: data => ({ ...data, notifications: true }),
-    }
-  })
-))
+const prefs = atom(
+  'prefs',
+  withDriver(d),
+  withMiddleware(
+    versioned({
+      current: 3,
+      migrate: {
+        0: (data) => ({ ...data, theme: 'light' }),
+        1: (data) => ({ ...data, locale: 'en' }),
+        2: (data) => ({ ...data, notifications: true }),
+      },
+    }),
+  ),
+);
 ```
 
 - **Write**: Tags `meta.ver = current`
@@ -280,15 +322,15 @@ const prefs = atom('prefs', withDriver(d), withMiddleware(
 ### cached — In-Memory Cache
 
 ```typescript
-const myCache = cached()
-const config = atom('config', withDriver(d), withMiddleware(myCache))
+const myCache = cached();
+const config = atom('config', withDriver(d), withMiddleware(myCache));
 
 // Second get() returns from memory — no driver read
-await config.get()
-await config.get()  // cache hit
+await config.get();
+await config.get(); // cache hit
 
 // Manually clear cache
-myCache.clear()
+myCache.clear();
 ```
 
 - Caches value to memory after first `get()`
@@ -299,20 +341,20 @@ myCache.clear()
 ### debounce — Write Debouncing
 
 ```typescript
-const myDebounce = debounce(500)
-const draft = atom('draft', withDriver(d), withMiddleware(myDebounce))
+const myDebounce = debounce(500);
+const draft = atom('draft', withDriver(d), withMiddleware(myDebounce));
 
 // Multiple set() within 500ms only trigger one driver write
-await draft.set('v1')
-await draft.set('v2')
-await draft.set('v3')
+await draft.set('v1');
+await draft.set('v2');
+await draft.set('v3');
 // Only 'v3' is written to driver
 
 // get() during debounce returns the latest pending value (in memory)
-const val = await draft.get()  // 'v3'
+const val = await draft.get(); // 'v3'
 
 // Manually flush to driver immediately
-await myDebounce.flush()
+await myDebounce.flush();
 ```
 
 - Ideal for drag positions, input autosave, and other high-frequency write scenarios
@@ -324,12 +366,16 @@ await myDebounce.flush()
 ### compress — Compression
 
 ```typescript
-const large = atom('large', withDriver(d), withMiddleware(
-  compress({
-    compress: data => myCompress(data),
-    decompress: data => myDecompress(data),
-  })
-))
+const large = atom(
+  'large',
+  withDriver(d),
+  withMiddleware(
+    compress({
+      compress: (data) => myCompress(data),
+      decompress: (data) => myDecompress(data),
+    }),
+  ),
+);
 ```
 
 - **Write**: `JSON.stringify` → `compress` → store as string
@@ -339,12 +385,16 @@ const large = atom('large', withDriver(d), withMiddleware(
 ### encrypt — Encryption
 
 ```typescript
-const secret = atom('secret', withDriver(d), withMiddleware(
-  encrypt({
-    encrypt: data => myEncrypt(data),
-    decrypt: data => myDecrypt(data),
-  })
-))
+const secret = atom(
+  'secret',
+  withDriver(d),
+  withMiddleware(
+    encrypt({
+      encrypt: (data) => myEncrypt(data),
+      decrypt: (data) => myDecrypt(data),
+    }),
+  ),
+);
 ```
 
 - Same pattern as compress, marks with `meta.enc = 1`
@@ -353,21 +403,21 @@ const secret = atom('secret', withDriver(d), withMiddleware(
 ### lock — Single-Tab Async Lock
 
 ```typescript
-const counter = atom('counter', withDriver(d), withMiddleware(lock()))
+const counter = atom('counter', withDriver(d), withMiddleware(lock()));
 // All operations on this atom instance are serialized
 ```
 
 ### crossTabLock — Cross-Tab Lock
 
 ```typescript
-const shared = atom('shared', withDriver(d), withMiddleware(crossTabLock()))
+const shared = atom('shared', withDriver(d), withMiddleware(crossTabLock()));
 // Cross-tab mutual exclusion via Web Locks API (set/del operations only)
 ```
 
 ### tabSync — Cross-Tab Sync
 
 ```typescript
-const settings = atom('settings', withDriver(d), withMiddleware(tabSync()))
+const settings = atom('settings', withDriver(d), withMiddleware(tabSync()));
 // set()/del() broadcasts to other tabs via BroadcastChannel
 ```
 
@@ -378,13 +428,15 @@ const settings = atom('settings', withDriver(d), withMiddleware(tabSync()))
 ### logger — Logging
 
 ```typescript
-const item = atom('item', withDriver(d), withMiddleware(logger()))
+const item = atom('item', withDriver(d), withMiddleware(logger()));
 // [atorage] set item (0.12ms)
 
 // Custom log function
-const item2 = atom('item2', withDriver(d), withMiddleware(
-  logger({ log: msg => myLogger.info(msg) })
-))
+const item2 = atom(
+  'item2',
+  withDriver(d),
+  withMiddleware(logger({ log: (msg) => myLogger.info(msg) })),
+);
 ```
 
 ### Middleware Ordering Guide
@@ -399,10 +451,10 @@ validate → ttl → versioned → cached → compress → encrypt → logger
 
 ```typescript
 // ✗ Wrong: cache hit returns directly, ttl cannot check expiry
-withMiddleware(cached(), ttl(1000))
+withMiddleware(cached(), ttl(1000));
 
 // ✓ Correct: ttl checks expiry first, then cache
-withMiddleware(ttl(1000), cached())
+withMiddleware(ttl(1000), cached());
 ```
 
 ### Custom Middleware
@@ -410,77 +462,77 @@ withMiddleware(ttl(1000), cached())
 Middleware can be a plain function or an object with lifecycle hooks:
 
 ```typescript
-import type { MiddlewareFunction, MiddlewareWithHooks, MiddlewareContext } from 'atorage'
+import type { MiddlewareFunction, MiddlewareWithHooks, MiddlewareContext } from 'atorage';
 
 // Plain function
 const myMiddleware: MiddlewareFunction = async (ctx, next) => {
   // Before next(): intercept/modify request
-  console.log(`${ctx.operation} ${ctx.key}`)
-  await next()
+  console.log(`${ctx.operation} ${ctx.key}`);
+  await next();
   // After next(): process/modify response
-}
+};
 
 // Object with hooks
 function myStatefulMiddleware(): MiddlewareWithHooks {
-  let cache: unknown = undefined
+  let cache: unknown = undefined;
   return {
     handle: async (ctx, next) => {
       // middleware logic
-      await next()
+      await next();
     },
     onInit(context) {
       // Called during atom initialization, context contains { key, atomId }
     },
     onExternalChange() {
       // Called when other atoms (in-tab) or cross-tab modify the same key
-      cache = undefined
+      cache = undefined;
     },
     onDispose() {
       // Called when atom is disposed
-      cache = undefined
+      cache = undefined;
     },
-  }
+  };
 }
 ```
 
 **MiddlewareContext** capabilities:
 
-| Property/Method | Description |
-|-----------------|-------------|
-| `key` | The atom's storage key |
-| `operation` | `'get'` / `'set'` / `'del'` / `'has'` |
-| `value` | Current value, readable and writable |
-| `meta` | Metadata object, middleware can read/write synchronously. Core auto wraps/unwraps |
-| `requestWriteback()` | Request writeback during get (e.g., after version migration) |
-| `requestDelete()` | Request deletion during get (e.g., TTL expiry cleanup) |
-| `reportError(error)` | Report non-fatal error (dispatches atom's `error` event) |
+| Property/Method      | Description                                                                       |
+| -------------------- | --------------------------------------------------------------------------------- |
+| `key`                | The atom's storage key                                                            |
+| `operation`          | `'get'` / `'set'` / `'del'` / `'has'`                                             |
+| `value`              | Current value, readable and writable                                              |
+| `meta`               | Metadata object, middleware can read/write synchronously. Core auto wraps/unwraps |
+| `requestWriteback()` | Request writeback during get (e.g., after version migration)                      |
+| `requestDelete()`    | Request deletion during get (e.g., TTL expiry cleanup)                            |
+| `reportError(error)` | Report non-fatal error (dispatches atom's `error` event)                          |
 
 ## Scopes
 
 A Scope is a signal broadcaster that does two things: **contributes a key prefix** and **broadcasts clear signals**.
 
 ```typescript
-import { createScope, withScope, atom, withDriver } from 'atorage'
+import { createScope, withScope, atom, withDriver } from 'atorage';
 
-const userScope = createScope('user:123')
+const userScope = createScope('user:123');
 
-const prefs = atom('prefs', withDriver(d), withScope(userScope))
+const prefs = atom('prefs', withDriver(d), withScope(userScope));
 // Actual storage key: "user:123:prefs"
 
-const history = atom('history', withDriver(d), withScope(userScope))
+const history = atom('history', withDriver(d), withScope(userScope));
 
 // Logout: clear all user data at once
-userScope.clear()
+userScope.clear();
 // Both prefs and history execute del() (through full middleware chain)
 ```
 
 Multi-level scopes are concatenated by argument order:
 
 ```typescript
-const auth = createScope('auth')
-const session = createScope('session')
+const auth = createScope('auth');
+const session = createScope('session');
 
-const token = atom('token', withScope(auth, session), withDriver(d))
+const token = atom('token', withScope(auth, session), withDriver(d));
 // Actual storage key: "auth:session:token"
 ```
 
@@ -489,17 +541,18 @@ Scopes are flat and independent — no hierarchy.
 ## Batch Operations
 
 ```typescript
-import { batch } from 'atorage'
+import { batch } from 'atorage';
 
 await batch(async () => {
-  await counter.set(1)
-  await counter.set(2)
-  await counter.set(3)
-})
+  await counter.set(1);
+  await counter.set(2);
+  await counter.set(3);
+});
 // Only ONE change event fires for counter, value = 3
 ```
 
 **Semantics:**
+
 - **No transactional atomicity** — if one operation fails, subsequent operations continue
 - **Event coalescing** — all `change` / `delete` events during batch are deferred and dispatched after completion
 - **Multiple sets on same atom** — only the last change event is dispatched
@@ -508,13 +561,13 @@ await batch(async () => {
 ## Utilities
 
 ```typescript
-import { snapshot, restore, clearByPrefix } from 'atorage'
+import { snapshot, restore, clearByPrefix } from 'atorage';
 ```
 
 ### snapshot
 
 ```typescript
-const data = await snapshot({ driver: d, prefix: 'myapp:' })
+const data = await snapshot({ driver: d, prefix: 'myapp:' });
 // → { 'myapp:key1': value1, 'myapp:key2': value2, ... }
 ```
 
@@ -523,7 +576,7 @@ Operates on raw driver data, bypasses middleware.
 ### restore
 
 ```typescript
-await restore(data, { driver: d })
+await restore(data, { driver: d });
 ```
 
 Writes snapshot data to the driver.
@@ -531,7 +584,7 @@ Writes snapshot data to the driver.
 ### clearByPrefix
 
 ```typescript
-const count = await clearByPrefix('user:oldId:', { driver: d })
+const count = await clearByPrefix('user:oldId:', { driver: d });
 // Returns the number of deleted keys
 ```
 
@@ -540,13 +593,13 @@ Useful for cleaning up orphaned data (e.g., user switching scenarios).
 ## Debug Tools
 
 ```typescript
-import { inspect, raw } from 'atorage/debug'
+import { inspect, raw } from 'atorage/debug';
 ```
 
 ### inspect
 
 ```typescript
-const info = await inspect(driver, 'my-key')
+const info = await inspect(driver, 'my-key');
 // → { exists: true, raw: { $v: 'hello', $m: { exp: 1749600000 } }, value: 'hello', meta: { exp: 1749600000 } }
 ```
 
@@ -555,9 +608,9 @@ const info = await inspect(driver, 'my-key')
 Bypasses middleware and the `{ $v, $m }` wrapper, operates directly on the driver:
 
 ```typescript
-await raw.get(driver, 'key')          // Read raw stored value
-await raw.set(driver, 'key', value)   // Write directly
-await raw.del(driver, 'key')          // Delete directly
+await raw.get(driver, 'key'); // Read raw stored value
+await raw.set(driver, 'key', value); // Write directly
+await raw.del(driver, 'key'); // Delete directly
 ```
 
 For debugging, data migration, and interop with external systems.
@@ -565,7 +618,7 @@ For debugging, data migration, and interop with external systems.
 ## Test Utilities
 
 ```typescript
-import { testDriver } from 'atorage/test'
+import { testDriver } from 'atorage/test';
 ```
 
 ### testDriver — Driver Conformance Testing
@@ -573,9 +626,9 @@ import { testDriver } from 'atorage/test'
 Run the standard conformance test suite against your custom driver:
 
 ```typescript
-import { testDriver } from 'atorage/test'
+import { testDriver } from 'atorage/test';
 
-testDriver('myDriver', () => createMyDriver())
+testDriver('myDriver', () => createMyDriver());
 ```
 
 Covers: get missing key, set/get round-trip, has, del, keys, keys(prefix), overwrite, and more.
@@ -585,33 +638,33 @@ Covers: get missing key, set/get round-trip, has, del, keys, keys(prefix), overw
 Atom extends `EventTarget`, supporting standard event listeners:
 
 ```typescript
-const token = atom<string>('token', withDriver(d))
+const token = atom<string>('token', withDriver(d));
 
 token.addEventListener('change', (e) => {
-  const { value } = (e as CustomEvent).detail
-  console.log('Value changed to:', value)
-})
+  const { value } = (e as CustomEvent).detail;
+  console.log('Value changed to:', value);
+});
 
 token.addEventListener('delete', () => {
-  console.log('Value deleted')
-})
+  console.log('Value deleted');
+});
 
 token.addEventListener('error', (e) => {
-  const { error } = (e as CustomEvent).detail
-  console.error('Operation error:', error)
-})
+  const { error } = (e as CustomEvent).detail;
+  console.error('Operation error:', error);
+});
 
 // AbortController support
-const ac = new AbortController()
-token.addEventListener('change', handler, { signal: ac.signal })
-ac.abort()  // removes listener
+const ac = new AbortController();
+token.addEventListener('change', handler, { signal: ac.signal });
+ac.abort(); // removes listener
 ```
 
-| Event | Trigger | detail |
-|-------|---------|--------|
+| Event    | Trigger                                                                  | detail                      |
+| -------- | ------------------------------------------------------------------------ | --------------------------- |
 | `change` | Value set, or same key modified by another instance (in-tab / cross-tab) | `{ value: T \| undefined }` |
-| `delete` | Value deleted, or scope clear triggers deletion | — |
-| `error` | Middleware or driver threw an exception | `{ error: Error }` |
+| `delete` | Value deleted, or scope clear triggers deletion                          | —                           |
+| `error`  | Middleware or driver threw an exception                                  | `{ error: Error }`          |
 
 **In-tab auto-sync:** The core includes a built-in event bus. Multiple atom instances sharing the same key within a tab automatically receive `change` events when any one calls `set()`. No `tabSync()` middleware needed for same-tab sync.
 
@@ -620,10 +673,10 @@ ac.abort()  // removes listener
 After `dispose()`, the atom enters a destroyed state:
 
 ```typescript
-const token = atom<string>('token', withDriver(d))
-await token.set('abc')
-token.dispose()
-await token.get()  // throws AtomDisposedError
+const token = atom<string>('token', withDriver(d));
+await token.set('abc');
+token.dispose();
+await token.get(); // throws AtomDisposedError
 ```
 
 - Subsequent `get()` / `set()` / `del()` / `has()` / `update()` throw `AtomDisposedError`
@@ -661,13 +714,13 @@ Value and meta are merged into a single structure, stored with a single I/O oper
 
 ## Export Structure
 
-| Import Path | Contents |
-|-------------|----------|
-| `atorage` | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `snapshot`, `restore`, `clearByPrefix` |
-| `atorage/drivers` | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver` |
-| `atorage/middleware` | All preset middleware |
-| `atorage/debug` | `raw`, `inspect` — debug tools |
-| `atorage/test` | `testDriver` — driver conformance testing |
+| Import Path          | Contents                                                                                                         |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `atorage`            | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `snapshot`, `restore`, `clearByPrefix` |
+| `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                                  |
+| `atorage/middleware` | All preset middleware                                                                                            |
+| `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                   |
+| `atorage/test`       | `testDriver` — driver conformance testing                                                                        |
 
 ## Design Decisions & Trade-offs
 
@@ -690,6 +743,7 @@ Expired data is not actively deleted; it's masked on read. This is industry stan
 ### tabSync Doesn't Send Values
 
 Cross-tab sync only broadcasts key + operation type; receivers re-read from the driver. Reasons:
+
 1. BroadcastChannel's structured clone has performance overhead for large objects
 2. Encrypted/compressed values are meaningless in another tab without re-running the middleware chain
 
@@ -716,6 +770,7 @@ All functionality including the IndexedDB driver is self-implemented, without ex
 ### Error Handling Strategy
 
 Exceptions from middleware or drivers propagate through two channels:
+
 1. **throw** — callers can `try-catch`
 2. **error event** — dispatched via EventTarget for global listeners
 

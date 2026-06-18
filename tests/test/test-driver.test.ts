@@ -1,4 +1,4 @@
-import { testDriver } from '../../src/test/test-driver'
-import { memoryDriver } from '../../src/drivers/memory'
+import { testDriver } from '../../src/test/test-driver';
+import { memoryDriver } from '../../src/drivers/memory';
 
-testDriver('memoryDriver', () => memoryDriver())
+testDriver('memoryDriver', () => memoryDriver());

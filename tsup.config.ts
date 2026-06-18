@@ -1,4 +1,4 @@
-import { defineConfig } from 'tsup'
+import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
@@ -8,8 +8,10 @@ export default defineConfig({
     'debug/index': 'src/debug/index.ts',
     'test/index': 'src/test/index.ts',
   },
-  format: ['esm'],
+  format: ['esm', 'cjs'],
   dts: true,
   clean: true,
-  outExtension: () => ({ js: '.mjs' }),
-})
+  outExtension: ({ format }) => ({
+    js: format === 'esm' ? '.mjs' : '.cjs',
+  }),
+});

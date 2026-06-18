@@ -1,19 +1,19 @@
-import { eventBus } from './core/event-bus.js'
+import { eventBus } from './core/event-bus.js';
 
 interface DeferredBusNotify {
-  sourceAtomId: string
-  event: { type: string; value?: unknown }
+  sourceAtomId: string;
+  event: { type: string; value?: unknown };
 }
 
 interface BatchContext {
-  deferredEvents: Map<string, { atom: EventTarget; event: Event }>
-  deferredBusNotify: Map<string, DeferredBusNotify>
+  deferredEvents: Map<string, { atom: EventTarget; event: Event }>;
+  deferredBusNotify: Map<string, DeferredBusNotify>;
 }
 
-let currentBatch: BatchContext | null = null
+let currentBatch: BatchContext | null = null;
 
 export function isBatching(): boolean {
-  return currentBatch !== null
+  return currentBatch !== null;
 }
 
 export function deferEvent(
@@ -22,8 +22,8 @@ export function deferEvent(
   target: EventTarget,
   event: Event,
 ): void {
-  if (!currentBatch) return
-  currentBatch.deferredEvents.set(`${atomId}:${atomKey}`, { atom: target, event })
+  if (!currentBatch) return;
+  currentBatch.deferredEvents.set(`${atomId}:${atomKey}`, { atom: target, event });
 }
 
 export function deferBusNotify(
@@ -31,51 +31,57 @@ export function deferBusNotify(
   sourceAtomId: string,
   event: { type: string; value?: unknown },
 ): void {
-  if (!currentBatch) return
-  currentBatch.deferredBusNotify.set(`${sourceAtomId}:${atomKey}`, { sourceAtomId, event })
+  if (!currentBatch) return;
+  currentBatch.deferredBusNotify.set(`${sourceAtomId}:${atomKey}`, { sourceAtomId, event });
 }
 
 export async function batch(fn: () => Promise<void> | void): Promise<void> {
   if (currentBatch) {
-    await fn()
-    return
+    await fn();
+    return;
   }
 
   currentBatch = {
     deferredEvents: new Map(),
     deferredBusNotify: new Map(),
+  };
+
+  let fnError: unknown;
+  try {
+    await fn();
+  } catch (err) {
+    fnError = err;
   }
 
-  try {
-    await fn()
-  } finally {
-    const events = currentBatch.deferredEvents
-    const busNotify = currentBatch.deferredBusNotify
-    currentBatch = null
+  const events = currentBatch.deferredEvents;
+  const busNotify = currentBatch.deferredBusNotify;
+  currentBatch = null;
 
-    const dispatchErrors: Error[] = []
+  const dispatchErrors: Error[] = [];
 
-    for (const [key, { sourceAtomId, event }] of busNotify) {
-      try {
-        const atomKey = key.substring(sourceAtomId.length + 1)
-        eventBus.notify(atomKey, sourceAtomId, event)
-      } catch (err) {
-        dispatchErrors.push(err instanceof Error ? err : new Error(String(err)))
-      }
+  for (const [key, { sourceAtomId, event }] of busNotify) {
+    try {
+      const atomKey = key.substring(sourceAtomId.length + 1);
+      eventBus.notify(atomKey, sourceAtomId, event);
+    } catch (err) {
+      dispatchErrors.push(err instanceof Error ? err : new Error(String(err)));
     }
+  }
 
-    for (const [, { atom, event }] of events) {
-      try {
-        atom.dispatchEvent(event)
-      } catch (err) {
-        dispatchErrors.push(err instanceof Error ? err : new Error(String(err)))
-      }
+  for (const [, { atom, event }] of events) {
+    try {
+      atom.dispatchEvent(event);
+    } catch (err) {
+      dispatchErrors.push(err instanceof Error ? err : new Error(String(err)));
     }
+  }
 
-    if (dispatchErrors.length > 0) {
-      throw dispatchErrors.length === 1
-        ? dispatchErrors[0]
-        : new AggregateError(dispatchErrors, 'Errors during batch event dispatch')
-    }
+  const allErrors: unknown[] = [];
+  if (fnError) allErrors.push(fnError);
+  allErrors.push(...dispatchErrors);
+
+  if (allErrors.length === 1) throw allErrors[0];
+  if (allErrors.length > 1) {
+    throw new AggregateError(allErrors, 'Errors during batch');
   }
 }

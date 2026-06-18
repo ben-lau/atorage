@@ -1,9 +1,9 @@
-import type { MiddlewareFunction } from '../types.js'
+import type { MiddlewareFunction } from '../types.js';
 
 export class ValidationError extends Error {
-  override name = 'ValidationError'
+  override name = 'ValidationError';
   constructor(key: string) {
-    super(`Validation failed for key "${key}"`)
+    super(`Validation failed for key "${key}"`);
   }
 }
 
@@ -11,17 +11,17 @@ export function validate(validator: (value: unknown) => boolean): MiddlewareFunc
   return async (ctx, next) => {
     if (ctx.operation === 'set') {
       if (!validator(ctx.value)) {
-        throw new ValidationError(ctx.key)
+        throw new ValidationError(ctx.key);
       }
     }
 
-    await next()
+    await next();
 
     if (ctx.operation === 'get' && ctx.value !== undefined) {
       if (!validator(ctx.value)) {
-        ctx.value = undefined
-        ctx.reportError(new ValidationError(ctx.key))
+        ctx.value = undefined;
+        ctx.reportError(new ValidationError(ctx.key));
       }
     }
-  }
+  };
 }

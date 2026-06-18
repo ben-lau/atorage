@@ -1,27 +1,27 @@
-import type { MiddlewareFunction } from '../types.js'
+import type { MiddlewareFunction } from '../types.js';
 
 export interface TtlOptions {
-  deleteOnExpire?: boolean
+  deleteOnExpire?: boolean;
 }
 
 export function ttl(duration: number, options?: TtlOptions): MiddlewareFunction {
-  const deleteOnExpire = options?.deleteOnExpire ?? false
+  const deleteOnExpire = options?.deleteOnExpire ?? false;
 
   return async (ctx, next) => {
     if (ctx.operation === 'set') {
-      ctx.meta.exp = Date.now() + duration
+      ctx.meta.exp = Date.now() + duration;
     }
 
-    await next()
+    await next();
 
     if (ctx.operation === 'get' || ctx.operation === 'has') {
-      const exp = ctx.meta.exp
+      const exp = ctx.meta.exp;
       if (typeof exp === 'number' && exp <= Date.now()) {
-        ctx.value = undefined
+        ctx.value = undefined;
         if (deleteOnExpire) {
-          ctx.requestDelete()
+          ctx.requestDelete();
         }
       }
     }
-  }
+  };
 }

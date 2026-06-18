@@ -1,51 +1,124 @@
 {
   "name": "atorage",
   "version": "0.0.1",
-  "description": "Atomic storage management library",
+  "description": "Type-safe, middleware-composable storage layer for localStorage, sessionStorage, and IndexedDB",
   "type": "module",
-  "main": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/index.d.mts",
+        "types": "./dist/index.d.ts",
         "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
       }
     },
     "./drivers": {
       "import": {
-        "types": "./dist/drivers/index.d.mts",
+        "types": "./dist/drivers/index.d.ts",
         "default": "./dist/drivers/index.mjs"
+      },
+      "require": {
+        "types": "./dist/drivers/index.d.cts",
+        "default": "./dist/drivers/index.cjs"
       }
     },
     "./middleware": {
       "import": {
-        "types": "./dist/middleware/index.d.mts",
+        "types": "./dist/middleware/index.d.ts",
         "default": "./dist/middleware/index.mjs"
+      },
+      "require": {
+        "types": "./dist/middleware/index.d.cts",
+        "default": "./dist/middleware/index.cjs"
       }
     },
     "./debug": {
       "import": {
-        "types": "./dist/debug/index.d.mts",
+        "types": "./dist/debug/index.d.ts",
         "default": "./dist/debug/index.mjs"
+      },
+      "require": {
+        "types": "./dist/debug/index.d.cts",
+        "default": "./dist/debug/index.cjs"
       }
     },
     "./test": {
       "import": {
-        "types": "./dist/test/index.d.mts",
+        "types": "./dist/test/index.d.ts",
         "default": "./dist/test/index.mjs"
+      },
+      "require": {
+        "types": "./dist/test/index.d.cts",
+        "default": "./dist/test/index.cjs"
       }
     }
   },
   "files": [
     "dist"
   ],
+  "sideEffects": false,
   "scripts": {
     "build": "tsup",
+    "dev": "tsup --watch",
     "test": "vitest run",
+    "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --deny-warnings src/ && oxlint tests/",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "publint": "publint",
+    "attw": "attw --pack --entrypoints .",
+    "validate": "pnpm build && pnpm publint && pnpm attw",
+    "size": "size-limit",
+    "size:check": "size-limit",
+    "clean": "rm -rf dist coverage *.tsbuildinfo",
+    "cz": "czg",
+    "prepare": "lefthook install",
+    "prepublishOnly": "pnpm build && pnpm publint && pnpm attw"
+  },
+  "size-limit": [
+    {
+      "path": "dist/index.mjs",
+      "limit": "10 kB"
+    },
+    {
+      "path": "dist/drivers/index.mjs",
+      "limit": "8 kB"
+    },
+    {
+      "path": "dist/middleware/index.mjs",
+      "limit": "10 kB"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ben-lau/atorage.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ben-lau/atorage/issues"
+  },
+  "homepage": "https://github.com/ben-lau/atorage#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@10.7.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "lefthook"
+    ]
   },
   "keywords": [
     "storage",
@@ -62,9 +135,19 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.3",
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "@size-limit/file": "^12.1.0",
     "@vitest/coverage-v8": "^4.1.8",
+    "czg": "^1.13.1",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.10.2",
+    "lefthook": "^2.1.9",
+    "oxfmt": "^0.54.0",
+    "oxlint": "^1.69.0",
+    "publint": "^0.3.21",
+    "size-limit": "^12.1.0",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"

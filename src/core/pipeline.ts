@@ -1,7 +1,7 @@
-import type { Middleware, MiddlewareContext, MiddlewareFunction } from '../types.js'
+import type { Middleware, MiddlewareContext, MiddlewareFunction } from '../types.js';
 
 function getHandler(mw: Middleware): MiddlewareFunction {
-  return typeof mw === 'function' ? mw : mw.handle
+  return typeof mw === 'function' ? mw : mw.handle;
 }
 
 export async function executePipeline(
@@ -9,13 +9,13 @@ export async function executePipeline(
   ctx: MiddlewareContext,
   coreHandler: () => Promise<void>,
 ): Promise<void> {
-  let next: () => Promise<void> = coreHandler
+  let next: () => Promise<void> = coreHandler;
 
   for (let i = middleware.length - 1; i >= 0; i--) {
-    const handler = getHandler(middleware[i])
-    const innerNext = next
-    next = () => handler(ctx, innerNext)
+    const handler = getHandler(middleware[i]);
+    const innerNext = next;
+    next = () => handler(ctx, innerNext);
   }
 
-  await next()
+  await next();
 }
