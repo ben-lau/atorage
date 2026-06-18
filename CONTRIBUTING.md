@@ -4,7 +4,7 @@ Thank you for your interest in contributing to atorage! Issues and PRs are welco
 
 ## Development Setup
 
-- Node.js >= 18 (recommended: 22)
+- Node.js >= 20 (recommended: 22)
 - pnpm >= 10
 
 ```bash
