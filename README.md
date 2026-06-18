@@ -1,28 +1,35 @@
 # Atorage
 
-原子化存储管理库。为 `localStorage`、`sessionStorage`、`IndexedDB` 提供统一的、可组合的、类型安全的管理方案。
+[![CI](https://github.com/ben-lau/atorage/actions/workflows/ci.yml/badge.svg)](https://github.com/ben-lau/atorage/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/atorage)](https://www.npmjs.com/package/atorage)
+[![npm downloads](https://img.shields.io/npm/dm/atorage)](https://www.npmjs.com/package/atorage)
+[![codecov](https://codecov.io/gh/ben-lau/atorage/graph/badge.svg)](https://codecov.io/gh/ben-lau/atorage)
+[![license](https://img.shields.io/npm/l/atorage)](https://github.com/ben-lau/atorage/blob/main/LICENSE)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/atorage)](https://bundlephobia.com/package/atorage)
 
-[English](./README.en.md)
+Type-safe, middleware-composable storage layer for `localStorage`, `sessionStorage`, and `IndexedDB`.
 
-## 特性
+[中文文档](./README.zh-CN.md)
 
-- **原子化** — 每个存储键是独立的 `Atom`，拥有自己的 driver、中间件和生命周期
-- **统一异步 API** — `get()` / `set()` / `del()` / `has()` / `update()` 均返回 Promise
-- **Driver 抽象** — 自由切换 localStorage、sessionStorage、IndexedDB 或自定义后端
-- **运行时降级** — 定义 driver 链，高优先级失败时自动降级到下一个
-- **中间件管线** — 洋葱模型，支持 TTL、校验、加密、压缩、缓存、防抖、锁等
-- **作用域管理** — 通过 Scope 将 atom 分组，一键清理（类似 `AbortController`）
-- **跨 Tab 同步** — 通过 `BroadcastChannel` 广播变更，`tabSync` 中间件即插即用
-- **类型安全** — 完整的 TypeScript 类型推导，strict 模式
-- **框架无关** — 零运行时依赖，纯 ESM，tree-shaking 友好
+## Features
 
-## 安装
+- **Atomic** — Each storage key is an independent `Atom` with its own driver, middleware, and lifecycle
+- **Unified async API** — `get()` / `set()` / `del()` / `has()` / `update()` all return Promises
+- **Driver abstraction** — Swap localStorage, sessionStorage, IndexedDB, or custom backends
+- **Runtime degradation** — Define a driver chain; if one fails, the next is tried automatically
+- **Middleware pipeline** — Onion model with TTL, validation, encryption, compression, caching, debounce, locking, and more
+- **Scope management** — Group atoms by scope for batch cleanup (like `AbortController` for storage)
+- **Cross-tab sync** — Broadcast changes via `BroadcastChannel` with `tabSync` middleware
+- **Type-safe** — Full TypeScript inference, strict mode
+- **Framework-agnostic** — Zero runtime dependencies, pure ESM, tree-shakeable
+
+## Install
 
 ```bash
 pnpm add atorage
 ```
 
-## 快速开始
+## Quick Start
 
 ```typescript
 import { atom, withDriver } from 'atorage';
@@ -33,50 +40,50 @@ const token = atom<string>('auth-token', withDriver(localStorageDriver()));
 await token.set('abc123');
 console.log(await token.get()); // 'abc123'
 console.log(await token.has()); // true
-await token.del(); // 返回 'abc123'
+await token.del(); // returns 'abc123'
 ```
 
-## 目录
+## Table of Contents
 
-- [核心概念](#核心概念)
+- [Core Concepts](#core-concepts)
   - [Atom](#atom)
-  - [Modifier](#modifier)
-  - [defineAtom — 预配置工厂](#defineatom--预配置工厂)
-- [Driver（存储后端）](#driver存储后端)
-  - [内置 Driver](#内置-driver)
-  - [运行时降级](#运行时降级)
-  - [自定义 Driver](#自定义-driver)
-- [中间件](#中间件)
-  - [ttl — 过期控制](#ttl--过期控制)
-  - [validate — 运行时校验](#validate--运行时校验)
-  - [versioned — 版本迁移](#versioned--版本迁移)
-  - [cached — 内存缓存](#cached--内存缓存)
-  - [debounce — 写入防抖](#debounce--写入防抖)
-  - [compress — 压缩](#compress--压缩)
-  - [encrypt — 加密](#encrypt--加密)
-  - [lock — 单 Tab 异步锁](#lock--单-tab-异步锁)
-  - [crossTabLock — 跨 Tab 锁](#crosstablock--跨-tab-锁)
-  - [tabSync — 跨 Tab 同步](#tabsync--跨-tab-同步)
-  - [logger — 日志](#logger--日志)
-  - [中间件顺序指南](#中间件顺序指南)
-  - [自定义中间件](#自定义中间件)
-- [Scope（作用域）](#scope作用域)
-- [批量操作](#批量操作)
-- [工具函数](#工具函数)
-- [调试工具](#调试工具)
-- [测试工具](#测试工具)
-- [事件系统](#事件系统)
-- [生命周期](#生命周期)
-- [架构](#架构)
-- [导出结构](#导出结构)
-- [设计决策与 Trade-offs](#设计决策与-trade-offs)
-- [非目标](#非目标)
+  - [Modifiers](#modifiers)
+  - [defineAtom — Preconfigured Factory](#defineatom--preconfigured-factory)
+- [Drivers (Storage Backends)](#drivers-storage-backends)
+  - [Built-in Drivers](#built-in-drivers)
+  - [Runtime Degradation](#runtime-degradation)
+  - [Custom Drivers](#custom-drivers)
+- [Middleware](#middleware)
+  - [ttl — Time-to-Live](#ttl--time-to-live)
+  - [validate — Runtime Validation](#validate--runtime-validation)
+  - [versioned — Version Migration](#versioned--version-migration)
+  - [cached — In-Memory Cache](#cached--in-memory-cache)
+  - [debounce — Write Debouncing](#debounce--write-debouncing)
+  - [compress — Compression](#compress--compression)
+  - [encrypt — Encryption](#encrypt--encryption)
+  - [lock — Single-Tab Async Lock](#lock--single-tab-async-lock)
+  - [crossTabLock — Cross-Tab Lock](#crosstablock--cross-tab-lock)
+  - [tabSync — Cross-Tab Sync](#tabsync--cross-tab-sync)
+  - [logger — Logging](#logger--logging)
+  - [Middleware Ordering Guide](#middleware-ordering-guide)
+  - [Custom Middleware](#custom-middleware)
+- [Scopes](#scopes)
+- [Batch Operations](#batch-operations)
+- [Utilities](#utilities)
+- [Debug Tools](#debug-tools)
+- [Test Utilities](#test-utilities)
+- [Event System](#event-system)
+- [Lifecycle](#lifecycle)
+- [Architecture](#architecture)
+- [Export Structure](#export-structure)
+- [Design Decisions & Trade-offs](#design-decisions--trade-offs)
+- [Non-Goals](#non-goals)
 
-## 核心概念
+## Core Concepts
 
 ### Atom
 
-Atom 是 atorage 的核心抽象——一个独立的存储单元，绑定唯一 key，可配置 driver、中间件和作用域。
+An Atom is the core abstraction — an independent storage unit bound to a unique key, configurable with drivers, middleware, and scopes.
 
 ```typescript
 interface Atom<T> extends EventTarget {
@@ -92,35 +99,35 @@ interface Atom<T> extends EventTarget {
 }
 ```
 
-| 方法         | 说明                                                                         |
-| ------------ | ---------------------------------------------------------------------------- |
-| `get()`      | 从 driver 读取值，经过中间件链处理。默认不缓存，启用 `cached()` 后走内存缓存 |
-| `set(value)` | 写入 driver，经过中间件链处理。成功后触发 `change` 事件                      |
-| `del()`      | 删除值及关联元数据，返回被删除的值。内部先 `get()` 再删除                    |
-| `has()`      | 判断值是否存在，走完整中间件链。TTL 过期的 key 返回 `false`                  |
-| `update(fn)` | 读-改-写原子操作，内部串行队列保证并发安全。支持异步 updater                 |
-| `getMeta()`  | 读取持久化元数据（TTL 过期时间、版本号等），只读，用于调试                   |
-| `dispose()`  | 销毁 atom，清理所有订阅和资源。后续操作抛出 `AtomDisposedError`              |
+| Method       | Description                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `get()`      | Read from driver through the middleware chain. No caching by default; enable `cached()` for in-memory caching |
+| `set(value)` | Write to driver through the middleware chain. Dispatches `change` event on success                            |
+| `del()`      | Delete value and associated metadata, returns the deleted value. Internally calls `get()` first               |
+| `has()`      | Check if value exists. Runs through the full middleware chain — TTL-expired keys return `false`               |
+| `update(fn)` | Atomic read-modify-write. Internal serial queue ensures concurrency safety. Supports async updaters           |
+| `getMeta()`  | Read persisted metadata (TTL expiry, version number, etc.). Read-only, for debugging                          |
+| `dispose()`  | Destroy the atom, clean up all subscriptions and resources. Subsequent operations throw `AtomDisposedError`   |
 
-### Modifier
+### Modifiers
 
-Modifier 是纯函数，用于配置 atom 的 driver、scope 和中间件：
+Modifiers are pure functions that configure an atom's drivers, scopes, and middleware:
 
 ```typescript
 import { atom, withDriver, withScope, withMiddleware, withPreMiddleware } from 'atorage';
 
 const a = atom<string>(
   'key',
-  withDriver(driver), // 指定存储后端（支持数组，表示降级链）
-  withScope(scope1, scope2), // 指定作用域，决定 key 前缀
-  withMiddleware(ttl(1000), cached()), // 中间件链（追加）
-  withPreMiddleware(validate(fn)), // 中间件链（前置插入）
+  withDriver(driver), // Specify storage backend (arrays = degradation chain)
+  withScope(scope1, scope2), // Specify scopes, determines key prefix
+  withMiddleware(ttl(1000), cached()), // Middleware chain (appended)
+  withPreMiddleware(validate(fn)), // Middleware chain (prepended before base)
 );
 ```
 
-### defineAtom — 预配置工厂
+### defineAtom — Preconfigured Factory
 
-为一组 atom 共享配置：
+Share configuration across a group of atoms:
 
 ```typescript
 import { defineAtom, withDriver, withMiddleware } from 'atorage';
@@ -135,16 +142,16 @@ const secureAtom = defineAtom(
 const token = secureAtom<string>('token');
 const refresh = secureAtom<string>(
   'refresh',
-  withPreMiddleware(validate(schema)), // 在 encrypt 之前执行
-  withMiddleware(logger()), // 在 encrypt 之后执行
+  withPreMiddleware(validate(schema)), // Runs before encrypt
+  withMiddleware(logger()), // Runs after encrypt
 );
-// token  链：encrypt → driver
-// refresh 链：validate → encrypt → logger → driver
+// token   chain: encrypt → driver
+// refresh chain: validate → encrypt → logger → driver
 ```
 
-## Driver（存储后端）
+## Drivers (Storage Backends)
 
-### 内置 Driver
+### Built-in Drivers
 
 ```typescript
 import {
@@ -155,31 +162,31 @@ import {
 } from 'atorage/drivers';
 ```
 
-| Driver                   | 存储介质       | 序列化     | batch | 适用场景            |
-| ------------------------ | -------------- | ---------- | ----- | ------------------- |
-| `memoryDriver()`         | 内存 Map       | 无         | ✓     | 测试、SSR、临时数据 |
-| `localStorageDriver()`   | localStorage   | JSON       | —     | 小型持久化数据      |
-| `sessionStorageDriver()` | sessionStorage | JSON       | —     | Tab 级别的会话数据  |
-| `indexedDBDriver(opts?)` | IndexedDB      | 结构化克隆 | ✓     | 大数据、Blob/File   |
+| Driver                   | Storage        | Serialization    | batch | Best For                     |
+| ------------------------ | -------------- | ---------------- | ----- | ---------------------------- |
+| `memoryDriver()`         | In-memory Map  | None             | ✓     | Testing, SSR, ephemeral data |
+| `localStorageDriver()`   | localStorage   | JSON             | —     | Small persistent data        |
+| `sessionStorageDriver()` | sessionStorage | JSON             | —     | Tab-scoped session data      |
+| `indexedDBDriver(opts?)` | IndexedDB      | Structured clone | ✓     | Large data, Blob/File        |
 
-`indexedDBDriver` 选项：
+`indexedDBDriver` options:
 
 ```typescript
 interface IndexedDBDriverOptions {
-  dbName?: string; // 默认 'atorage'
-  storeName?: string; // 默认 'kv'
+  dbName?: string; // Default: 'atorage'
+  storeName?: string; // Default: 'kv'
 }
 ```
 
-**Driver 接口**——所有 driver 接收 `unknown` 类型的值，内部自行处理序列化：
+**Driver interface** — All drivers accept `unknown` values and handle serialization internally:
 
-- localStorage / sessionStorage：自动 `JSON.stringify` / `JSON.parse`
-- IndexedDB：原生结构化克隆，可直接存储 `File`、`Blob`、`ArrayBuffer`
-- memory：直接存引用
+- localStorage / sessionStorage: Auto `JSON.stringify` / `JSON.parse`
+- IndexedDB: Native structured clone, can store `File`, `Blob`, `ArrayBuffer` directly
+- memory: Stores references as-is
 
-### 运行时降级
+### Runtime Degradation
 
-传入 driver 数组，形成降级链：
+Pass a driver array to form a degradation chain:
 
 ```typescript
 const data = atom(
@@ -188,18 +195,18 @@ const data = atom(
 );
 ```
 
-**降级行为：**
+**Degradation behavior:**
 
-- **初始化**：调用每个 driver 的 `available()` 过滤不支持的 driver（如 Node.js 中过滤 localStorage）
-- **写入**：依次尝试，第一个成功的 driver 存储数据，同时清理其他 driver 中的同 key 副本
-- **读取**：依次尝试，返回第一个非 `undefined` 的结果
-- **删除**：所有 driver 都执行删除
+- **Initialization**: Each driver's `available()` filters unsupported drivers (e.g., no localStorage in Node.js)
+- **Write**: Tries each driver in order; the first successful one stores data, and stale copies in other drivers are cleaned up
+- **Read**: Tries each in order; returns the first non-`undefined` result
+- **Delete**: All drivers execute delete
 
-核心保证：一个 key 在稳态下只存在于一个 driver 中。高优先级 driver 恢复可用时，新写入自然回流。
+Core guarantee: a key exists in exactly one driver at steady state. When a higher-priority driver recovers, new writes naturally flow back to it.
 
-### 自定义 Driver
+### Custom Drivers
 
-实现 `Driver` 接口即可：
+Implement the `Driver` interface:
 
 ```typescript
 import type { Driver } from 'atorage';
@@ -236,11 +243,11 @@ function redisDriver(url: string): Driver {
 }
 ```
 
-可选方法：`available()`（环境检测）和 `batch(ops)`（批量操作）。
+Optional methods: `available()` (environment detection) and `batch(ops)` (batch operations).
 
-## 中间件
+## Middleware
 
-中间件采用洋葱模型，在 `next()` 前修改 `ctx.value` 影响下游，`next()` 后修改影响上游返回值。
+Middleware uses the onion model — modify `ctx.value` before `next()` to affect downstream, after `next()` to affect the upstream return value.
 
 ```typescript
 import { withMiddleware } from 'atorage';
@@ -259,27 +266,27 @@ import {
 } from 'atorage/middleware';
 ```
 
-### ttl — 过期控制
+### ttl — Time-to-Live
 
 ```typescript
 const session = atom(
   'session',
   withDriver(d),
   withMiddleware(
-    ttl(30 * 60 * 1000), // 30 分钟
+    ttl(30 * 60 * 1000), // 30 minutes
   ),
 );
 
-// 启用过期后主动删除 driver 数据
+// Enable active deletion of expired data from driver
 const temp = atom('temp', withDriver(d), withMiddleware(ttl(5000, { deleteOnExpire: true })));
 ```
 
-- **写入**：在 meta 中记录 `exp`（过期时间戳）
-- **读取**：过期返回 `undefined`，`deleteOnExpire: true` 时主动清理 driver 数据
-- **`has()`**：过期的 key 返回 `false`
-- 默认惰性过期（不主动删除），这是业界标准（Redis、Guava），减少 I/O 开销
+- **Write**: Records `exp` (expiry timestamp) in meta
+- **Read**: Returns `undefined` when expired; `deleteOnExpire: true` actively cleans driver data
+- **`has()`**: Expired keys return `false`
+- Default lazy expiry (no active deletion) — industry standard (Redis, Guava), reduces I/O overhead
 
-### validate — 运行时校验
+### validate — Runtime Validation
 
 ```typescript
 const age = atom<number>(
@@ -288,13 +295,13 @@ const age = atom<number>(
   withMiddleware(validate((v) => typeof v === 'number' && v >= 0 && v <= 150)),
 );
 
-await age.set(-1); // 抛出 ValidationError
+await age.set(-1); // throws ValidationError
 ```
 
-- **写入**：校验失败抛出 `ValidationError`，阻止写入
-- **读取**：校验失败返回 `undefined`，通过 `error` 事件通知
+- **Write**: Throws `ValidationError` on validation failure, preventing the write
+- **Read**: Returns `undefined` on validation failure, notifies via `error` event
 
-### versioned — 版本迁移
+### versioned — Version Migration
 
 ```typescript
 const prefs = atom(
@@ -313,57 +320,57 @@ const prefs = atom(
 );
 ```
 
-- **写入**：标记 `meta.ver = current`
-- **读取**：检测旧版本，依次执行 migrate 函数升级，然后回写
-- 无 `ver` 字段的旧数据视为 v0
-- 不支持降级（高版本数据读取时抛错）
-- 回写走完整中间件链，保证加密/压缩等中间件正确处理
+- **Write**: Tags `meta.ver = current`
+- **Read**: Detects old versions, runs migrate functions sequentially, then writes back
+- Legacy data without `ver` is treated as v0
+- Downgrades not supported (throws on higher version data)
+- Writeback runs through the full middleware chain, ensuring encrypt/compress etc. process correctly
 
-### cached — 内存缓存
+### cached — In-Memory Cache
 
 ```typescript
 const myCache = cached();
 const config = atom('config', withDriver(d), withMiddleware(myCache));
 
-// 第二次 get() 直接返回内存缓存，不读 driver
+// Second get() returns from memory — no driver read
 await config.get();
-await config.get(); // 缓存命中
+await config.get(); // cache hit
 
-// 手动清除缓存
+// Manually clear cache
 myCache.clear();
 ```
 
-- 首次 `get()` 后缓存值到内存
-- `set()` 更新缓存，`del()` 清除缓存
-- 同 Tab 其他 atom 修改同 key 或跨 Tab 同步时自动清除缓存
-- `dispose()` 时自动清除
+- Caches value to memory after first `get()`
+- `set()` updates cache, `del()` clears cache
+- Auto-clears when other atoms modify the same key (in-tab) or via cross-tab sync
+- Auto-clears on `dispose()`
 
-### debounce — 写入防抖
+### debounce — Write Debouncing
 
 ```typescript
 const myDebounce = debounce(500);
 const draft = atom('draft', withDriver(d), withMiddleware(myDebounce));
 
-// 500ms 内多次 set() 只触发一次 driver 写入
+// Multiple set() within 500ms only trigger one driver write
 await draft.set('v1');
 await draft.set('v2');
 await draft.set('v3');
-// 只有 'v3' 会被写入 driver
+// Only 'v3' is written to driver
 
-// 防抖期间 get() 返回最新 pending 值（内存中），保证读写一致
+// get() during debounce returns the latest pending value (in memory)
 const val = await draft.get(); // 'v3'
 
-// 手动立即落盘
+// Manually flush to driver immediately
 await myDebounce.flush();
 ```
 
-- 适用于拖拽位置、输入框实时保存等高频写入场景
-- `change` 事件在实际落盘后触发，非调用时
-- `del()` 取消 pending 写入
-- `await set()` 在注册 timer 后即 resolve，**不等待实际落盘**。落盘失败通过 atom 的 `error` 事件传播
-- 与 `versioned()` 组合时，版本迁移回写也会被延迟。关键路径建议在 `get()` 后手动 `flush()`
+- Ideal for drag positions, input autosave, and other high-frequency write scenarios
+- `change` event fires after actual persistence, not at call time
+- `del()` cancels pending writes
+- `await set()` resolves after registering the timer, **not after actual persistence**. Persistence failures propagate via atom's `error` event
+- When combined with `versioned()`, version migration writebacks are also delayed. Call `flush()` after `get()` on critical paths
 
-### compress — 压缩
+### compress — Compression
 
 ```typescript
 const large = atom(
@@ -378,11 +385,11 @@ const large = atom(
 );
 ```
 
-- **写入**：`JSON.stringify` → `compress` → 存储字符串
-- **读取**：`decompress` → `JSON.parse`
-- 通过 `meta.cmp = 1` 标记已压缩数据
+- **Write**: `JSON.stringify` → `compress` → store as string
+- **Read**: `decompress` → `JSON.parse`
+- Marks compressed data with `meta.cmp = 1`
 
-### encrypt — 加密
+### encrypt — Encryption
 
 ```typescript
 const secret = atom(
@@ -397,41 +404,41 @@ const secret = atom(
 );
 ```
 
-- 与 compress 同构，通过 `meta.enc = 1` 标记已加密数据
-- 加解密实现完全由用户提供，建议使用 AES-GCM 等带认证的算法
+- Same pattern as compress, marks with `meta.enc = 1`
+- Encryption implementation is entirely user-provided; AES-GCM or other authenticated algorithms recommended
 
-### lock — 单 Tab 异步锁
+### lock — Single-Tab Async Lock
 
 ```typescript
 const counter = atom('counter', withDriver(d), withMiddleware(lock()));
-// 同一 atom 实例上的所有操作串行化
+// All operations on this atom instance are serialized
 ```
 
-### crossTabLock — 跨 Tab 锁
+### crossTabLock — Cross-Tab Lock
 
 ```typescript
 const shared = atom('shared', withDriver(d), withMiddleware(crossTabLock()));
-// 通过 Web Locks API 跨 tab 互斥（仅 set/del 操作）
+// Cross-tab mutual exclusion via Web Locks API (set/del operations only)
 ```
 
-### tabSync — 跨 Tab 同步
+### tabSync — Cross-Tab Sync
 
 ```typescript
 const settings = atom('settings', withDriver(d), withMiddleware(tabSync()));
-// set()/del() 后通过 BroadcastChannel 通知其他 tab
+// set()/del() broadcasts to other tabs via BroadcastChannel
 ```
 
-- 仅广播 key 和操作类型，**不传 value**——接收端从 driver 重新读取
-- 因此与 encrypt 等中间件的顺序无关，不存在明文泄露风险
-- 可自定义 channel 名：`tabSync('my-channel')`
+- Broadcasts only key and operation type, **never the value** — receivers re-read from driver
+- Ordering relative to encrypt is irrelevant — no plaintext leak risk
+- Custom channel name: `tabSync('my-channel')`
 
-### logger — 日志
+### logger — Logging
 
 ```typescript
 const item = atom('item', withDriver(d), withMiddleware(logger()));
 // [atorage] set item (0.12ms)
 
-// 自定义日志函数
+// Custom log function
 const item2 = atom(
   'item2',
   withDriver(d),
@@ -439,77 +446,77 @@ const item2 = atom(
 );
 ```
 
-### 中间件顺序指南
+### Middleware Ordering Guide
 
-中间件顺序由用户负责，推荐顺序：
+Middleware ordering is the user's responsibility. Recommended order:
 
 ```
 validate → ttl → versioned → cached → compress → encrypt → logger
 ```
 
-**常见陷阱：** `cached()` 必须在 `ttl()` 之后，否则缓存命中时 TTL 无法检查过期：
+**Common pitfall:** `cached()` must come after `ttl()`, otherwise cache hits bypass TTL expiry checks:
 
 ```typescript
-// ✗ 错误：cache 命中直接返回，ttl 无法拦截过期数据
+// ✗ Wrong: cache hit returns directly, ttl cannot check expiry
 withMiddleware(cached(), ttl(1000));
 
-// ✓ 正确：ttl 先检查过期，再走缓存
+// ✓ Correct: ttl checks expiry first, then cache
 withMiddleware(ttl(1000), cached());
 ```
 
-### 自定义中间件
+### Custom Middleware
 
-中间件可以是纯函数或带生命周期钩子的对象：
+Middleware can be a plain function or an object with lifecycle hooks:
 
 ```typescript
 import type { MiddlewareFunction, MiddlewareWithHooks, MiddlewareContext } from 'atorage';
 
-// 纯函数形式
+// Plain function
 const myMiddleware: MiddlewareFunction = async (ctx, next) => {
-  // next() 前：拦截/修改请求
+  // Before next(): intercept/modify request
   console.log(`${ctx.operation} ${ctx.key}`);
   await next();
-  // next() 后：处理/修改响应
+  // After next(): process/modify response
 };
 
-// 带钩子的对象形式
+// Object with hooks
 function myStatefulMiddleware(): MiddlewareWithHooks {
   let cache: unknown = undefined;
   return {
     handle: async (ctx, next) => {
-      // 中间件逻辑
+      // middleware logic
       await next();
     },
     onInit(context) {
-      // atom 初始化时调用，context 包含 { key, atomId }
+      // Called during atom initialization, context contains { key, atomId }
     },
     onExternalChange() {
-      // 同 tab 其他 atom 或跨 tab 修改了同 key 时调用
+      // Called when other atoms (in-tab) or cross-tab modify the same key
       cache = undefined;
     },
     onDispose() {
-      // atom dispose 时调用
+      // Called when atom is disposed
       cache = undefined;
     },
   };
 }
 ```
 
-**MiddlewareContext** 提供的能力：
+**MiddlewareContext** capabilities:
 
-| 属性/方法            | 说明                                              |
-| -------------------- | ------------------------------------------------- |
-| `key`                | atom 的存储 key                                   |
-| `operation`          | `'get'` / `'set'` / `'del'` / `'has'`             |
-| `value`              | 当前值，可读写                                    |
-| `meta`               | 元数据对象，中间件可同步读写。核心层自动包裹/解包 |
-| `requestWriteback()` | 在 get 操作中请求回写（如版本迁移后）             |
-| `requestDelete()`    | 在 get 操作中请求删除（如 TTL 过期后主动清理）    |
-| `reportError(error)` | 报告非致命错误（触发 atom 的 `error` 事件）       |
+| Property/Method      | Description                                                                       |
+| -------------------- | --------------------------------------------------------------------------------- |
+| `key`                | The atom's storage key                                                            |
+| `operation`          | `'get'` / `'set'` / `'del'` / `'has'`                                             |
+| `value`              | Current value, readable and writable                                              |
+| `meta`               | Metadata object, middleware can read/write synchronously. Core auto wraps/unwraps |
+| `requestWriteback()` | Request writeback during get (e.g., after version migration)                      |
+| `requestDelete()`    | Request deletion during get (e.g., TTL expiry cleanup)                            |
+| `reportError(error)` | Report non-fatal error (dispatches atom's `error` event)                          |
 
-## Scope（作用域）
+## Scopes
 
-Scope 是信号广播器，做两件事：**贡献 key 前缀** 和 **广播 clear 信号**。
+A Scope is a signal broadcaster that does two things: **contributes a key prefix** and **broadcasts clear signals**.
 
 ```typescript
 import { createScope, withScope, atom, withDriver } from 'atorage';
@@ -517,28 +524,28 @@ import { createScope, withScope, atom, withDriver } from 'atorage';
 const userScope = createScope('user:123');
 
 const prefs = atom('prefs', withDriver(d), withScope(userScope));
-// 实际存储 key: "user:123:prefs"
+// Actual storage key: "user:123:prefs"
 
 const history = atom('history', withDriver(d), withScope(userScope));
 
-// 用户登出：一键清理所有用户数据
+// Logout: clear all user data at once
 userScope.clear();
-// prefs 和 history 都会执行 del()（走完整中间件链）
+// Both prefs and history execute del() (through full middleware chain)
 ```
 
-多级 scope 通过参数顺序拼接前缀：
+Multi-level scopes are concatenated by argument order:
 
 ```typescript
 const auth = createScope('auth');
 const session = createScope('session');
 
 const token = atom('token', withScope(auth, session), withDriver(d));
-// 实际存储 key: "auth:session:token"
+// Actual storage key: "auth:session:token"
 ```
 
-Scope 之间无层级关系，扁平独立。
+Scopes are flat and independent — no hierarchy.
 
-## 批量操作
+## Batch Operations
 
 ```typescript
 import { batch } from 'atorage';
@@ -548,244 +555,243 @@ await batch(async () => {
   await counter.set(2);
   await counter.set(3);
 });
-// counter 的 change 事件只派发一次，value = 3
+// Only ONE change event fires for counter, value = 3
 ```
 
-**语义：**
+**Semantics:**
 
-- **不保证事务原子性**——某个操作失败后，后续操作继续执行
-- **事件合并**——batch 期间所有 `change` / `delete` 事件暂存，结束后统一派发
-- **同一 atom 多次 set**——只派发最后一次的 change 事件
-- **嵌套 batch**——合并到外层，事件延迟到最外层 batch 结束后派发
+- **No transactional atomicity** — if one operation fails, subsequent operations continue
+- **Event coalescing** — all `change` / `delete` events during batch are deferred and dispatched after completion
+- **Multiple sets on same atom** — only the last change event is dispatched
+- **Nested batch** — merges into the outer batch; events defer until the outermost batch completes
 
-## 工具函数
+## Utilities
 
 ```typescript
 import { snapshot, restore, clearByPrefix } from 'atorage';
 ```
 
-### snapshot — 快照
+### snapshot
 
 ```typescript
 const data = await snapshot({ driver: d, prefix: 'myapp:' });
 // → { 'myapp:key1': value1, 'myapp:key2': value2, ... }
 ```
 
-直接操作 driver 层原始数据，不经过中间件。
+Operates on raw driver data, bypasses middleware.
 
-### restore — 恢复
+### restore
 
 ```typescript
 await restore(data, { driver: d });
 ```
 
-将快照数据写入 driver。
+Writes snapshot data to the driver.
 
-### clearByPrefix — 按前缀清理
+### clearByPrefix
 
 ```typescript
 const count = await clearByPrefix('user:oldId:', { driver: d });
-// 返回删除的 key 数量
+// Returns the number of deleted keys
 ```
 
-用于清理孤儿数据（如用户切换场景）。
+Useful for cleaning up orphaned data (e.g., user switching scenarios).
 
-## 调试工具
+## Debug Tools
 
 ```typescript
 import { inspect, raw } from 'atorage/debug';
 ```
 
-### inspect — 检查存储数据
+### inspect
 
 ```typescript
 const info = await inspect(driver, 'my-key');
 // → { exists: true, raw: { $v: 'hello', $m: { exp: 1749600000 } }, value: 'hello', meta: { exp: 1749600000 } }
 ```
 
-### raw — 原始 driver 操作
+### raw — Direct Driver Access
 
-绕过中间件和 `{ $v, $m }` 包裹，直接操作 driver：
+Bypasses middleware and the `{ $v, $m }` wrapper, operates directly on the driver:
 
 ```typescript
-await raw.get(driver, 'key'); // 读取原始存储值
-await raw.set(driver, 'key', value); // 直接写入
-await raw.del(driver, 'key'); // 直接删除
+await raw.get(driver, 'key'); // Read raw stored value
+await raw.set(driver, 'key', value); // Write directly
+await raw.del(driver, 'key'); // Delete directly
 ```
 
-用于调试、数据迁移、与外部系统互通。
+For debugging, data migration, and interop with external systems.
 
-## 测试工具
+## Test Utilities
 
 ```typescript
 import { testDriver } from 'atorage/test';
 ```
 
-### testDriver — Driver 一致性测试
+### testDriver — Driver Conformance Testing
 
-对自定义 driver 运行标准合规测试套件：
+Run the standard conformance test suite against your custom driver:
 
 ```typescript
 import { testDriver } from 'atorage/test';
-import { describe } from 'vitest';
 
 testDriver('myDriver', () => createMyDriver());
 ```
 
-覆盖：get 缺失 key、set/get 往返、has、del、keys、keys(prefix)、覆盖写入等。
+Covers: get missing key, set/get round-trip, has, del, keys, keys(prefix), overwrite, and more.
 
-## 事件系统
+## Event System
 
-Atom 继承 `EventTarget`，支持标准的事件监听：
+Atom extends `EventTarget`, supporting standard event listeners:
 
 ```typescript
 const token = atom<string>('token', withDriver(d));
 
 token.addEventListener('change', (e) => {
   const { value } = (e as CustomEvent).detail;
-  console.log('值变更为:', value);
+  console.log('Value changed to:', value);
 });
 
 token.addEventListener('delete', () => {
-  console.log('值被删除');
+  console.log('Value deleted');
 });
 
 token.addEventListener('error', (e) => {
   const { error } = (e as CustomEvent).detail;
-  console.error('操作出错:', error);
+  console.error('Operation error:', error);
 });
 
-// 支持 AbortController
+// AbortController support
 const ac = new AbortController();
 token.addEventListener('change', handler, { signal: ac.signal });
-ac.abort(); // 移除监听
+ac.abort(); // removes listener
 ```
 
-| 事件     | 触发时机                                         | detail                      |
-| -------- | ------------------------------------------------ | --------------------------- |
-| `change` | 值被 set，或同 tab / 跨 tab 其他实例修改了同 key | `{ value: T \| undefined }` |
-| `delete` | 值被 del，或 scope clear 触发删除                | —                           |
-| `error`  | 中间件或 driver 抛出异常                         | `{ error: Error }`          |
+| Event    | Trigger                                                                  | detail                      |
+| -------- | ------------------------------------------------------------------------ | --------------------------- |
+| `change` | Value set, or same key modified by another instance (in-tab / cross-tab) | `{ value: T \| undefined }` |
+| `delete` | Value deleted, or scope clear triggers deletion                          | —                           |
+| `error`  | Middleware or driver threw an exception                                  | `{ error: Error }`          |
 
-**同 Tab 自动互通：** 核心层内置事件总线，同一 tab 内多个 atom 实例共享同一 key 时，一个 `set()` 自动触发其他实例的 `change` 事件。无需 `tabSync()` 中间件。
+**In-tab auto-sync:** The core includes a built-in event bus. Multiple atom instances sharing the same key within a tab automatically receive `change` events when any one calls `set()`. No `tabSync()` middleware needed for same-tab sync.
 
-## 生命周期
+## Lifecycle
 
-`dispose()` 调用后，atom 进入已销毁状态：
+After `dispose()`, the atom enters a destroyed state:
 
 ```typescript
 const token = atom<string>('token', withDriver(d));
 await token.set('abc');
 token.dispose();
-await token.get(); // 抛出 AtomDisposedError
+await token.get(); // throws AtomDisposedError
 ```
 
-- 后续 `get()` / `set()` / `del()` / `has()` / `update()` 抛出 `AtomDisposedError`
-- 当前正在执行的异步操作会等待完成，排队中的操作被 reject
-- 自动从事件总线注销、移除 scope 监听、调用中间件 `onDispose()`
-- **不释放 driver**——driver 可能被多个 atom 共享，生命周期由用户管理
+- Subsequent `get()` / `set()` / `del()` / `has()` / `update()` throw `AtomDisposedError`
+- Currently executing async operations complete normally; queued operations are rejected
+- Automatically unregisters from event bus, removes scope listeners, calls middleware `onDispose()`
+- **Does not release the driver** — drivers may be shared across atoms; their lifecycle is user-managed
 
-## 架构
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
 │  Atom API                                       │  atom(), defineAtom(), batch()
 ├─────────────────────────────────────────────────┤
-│  Middleware Pipeline（洋葱模型）                  │  validate, ttl, encrypt, ...
+│  Middleware Pipeline (Onion Model)              │  validate, ttl, encrypt, ...
 ├─────────────────────────────────────────────────┤
-│  Scope Management                               │  createScope(), key 前缀拼接
+│  Scope Management                               │  createScope(), key prefixing
 ├─────────────────────────────────────────────────┤
 │  Coordination                                   │  EventBus, lock, tabSync
 ├─────────────────────────────────────────────────┤
-│  Driver（持久化后端）                             │  localStorage, indexedDB, memory
+│  Driver (Persistence)                           │  localStorage, indexedDB, memory
 └─────────────────────────────────────────────────┘
 ```
 
-### 存储格式
+### Storage Format
 
-Value 和 meta 合并为一个结构体存储，单次 I/O 读写：
+Value and meta are merged into a single structure, stored with a single I/O operation:
 
 ```
 { $v: actualValue, $m: { exp: 1749600000, ver: 3, ... } }
 ```
 
-- `$v` — 实际值
-- `$m` — 元数据（无 meta 时省略）
-- 核心层自动包裹/解包，中间件和用户 API 看到的都是干净的分离视图
+- `$v` — actual value
+- `$m` — metadata (omitted when empty)
+- Core auto wraps/unwraps; middleware and user API see clean separated views
 
-## 导出结构
+## Export Structure
 
-| 导入路径             | 内容                                                                                                           |
-| -------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `atorage`            | 核心 API：`atom`、`defineAtom`、`createScope`、`batch`、modifier、类型、`snapshot`、`restore`、`clearByPrefix` |
-| `atorage/drivers`    | `memoryDriver`、`localStorageDriver`、`sessionStorageDriver`、`indexedDBDriver`                                |
-| `atorage/middleware` | 全部预设中间件                                                                                                 |
-| `atorage/debug`      | `raw`、`inspect` — 调试工具                                                                                    |
-| `atorage/test`       | `testDriver` — driver 一致性测试                                                                               |
+| Import Path          | Contents                                                                                                         |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `atorage`            | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `snapshot`, `restore`, `clearByPrefix` |
+| `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                                  |
+| `atorage/middleware` | All preset middleware                                                                                            |
+| `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                   |
+| `atorage/test`       | `testDriver` — driver conformance testing                                                                        |
 
-## 设计决策与 Trade-offs
+## Design Decisions & Trade-offs
 
-### 统一全异步 API
+### Unified Async API
 
-所有操作返回 Promise，即使底层 driver（如 localStorage）是同步的。这保证了 API 一致性，使得切换 driver 不需要修改调用代码。代价是简单场景有微小的 await 开销。
+All operations return Promises, even when the underlying driver (e.g., localStorage) is synchronous. This ensures API consistency so that switching drivers never requires call-site changes. The trade-off is minimal `await` overhead in simple scenarios.
 
-### 默认不缓存
+### No Caching by Default
 
-正确性优先。每次 `get()` 默认从 driver 真实读取，避免缓存一致性问题。需要缓存时通过 `cached()` 中间件显式启用。
+Correctness first. Every `get()` reads from the driver by default, avoiding cache consistency issues. Opt in to caching explicitly via the `cached()` middleware.
 
-### 元数据与值合并存储
+### Merged Value + Metadata Storage
 
-`{ $v, $m }` 信封格式保证 value 和 meta 的原子一致——不可能出现 value 写入但 meta 丢失的情况。单次 I/O 读写，无双写问题。
+The `{ $v, $m }` envelope format guarantees atomic consistency between value and metadata — you can never have a value written but its metadata lost. Single I/O operation, no dual-write issues.
 
-### TTL 惰性过期
+### Lazy TTL Expiry
 
-过期数据不主动删除，只在读取时遮蔽。这是业界标准做法（Redis、Guava），减少每次 get 的 I/O 开销。需要主动清理时使用 `{ deleteOnExpire: true }` 或定期调用 `clearByPrefix`。
+Expired data is not actively deleted; it's masked on read. This is industry standard (Redis, Guava), reducing I/O overhead on every get. Use `{ deleteOnExpire: true }` or periodic `clearByPrefix` for active cleanup.
 
-### tabSync 不传 value
+### tabSync Doesn't Send Values
 
-跨 tab 同步只广播 key + 操作类型，接收端从 driver 重新读取。原因：
+Cross-tab sync only broadcasts key + operation type; receivers re-read from the driver. Reasons:
 
-1. BroadcastChannel 的 structured clone 对大对象有性能开销
-2. 加密/压缩后的值在另一个 tab 直接使用无意义，仍需走中间件链
+1. BroadcastChannel's structured clone has performance overhead for large objects
+2. Encrypted/compressed values are meaningless in another tab without re-running the middleware chain
 
-### 中间件顺序是用户责任
+### Middleware Ordering Is the User's Responsibility
 
-与 Express / Koa 中间件模型一致，顺序由用户控制。库不做隐式重排，因为不同场景可能需要不同的执行顺序。
+Consistent with Express / Koa middleware models. The library does not implicitly reorder, as different scenarios may require different execution orders.
 
-### `del()` 返回值非原子保证
+### `del()` Return Value Is Not Atomically Guaranteed
 
-`del()` 先 `get()` 读旧值再删除，两步之间存在并发写入窗口。返回的旧值是 best-effort 的。只有 `update()` 通过内部串行队列保证原子性。
+`del()` reads the old value via `get()` before deleting — there's a concurrent write window between the two steps. The returned old value is best-effort. Only `update()` guarantees atomicity through its internal serial queue.
 
-### `has()` 需要读取完整值
+### `has()` Reads the Full Value
 
-`has()` 需要走完整中间件链（TTL 需要检查过期时间），因此不能在 driver 层直接检查 key 存在性。对大值有额外开销，但保证了语义正确性。
+`has()` must traverse the full middleware chain (TTL needs to check expiry), so it cannot simply check key existence at the driver level. This adds overhead for large values but ensures semantic correctness.
 
-### dispose 不释放 driver
+### dispose Does Not Release Drivers
 
-Driver 可能被多个 atom 共享，一个 atom dispose 不应销毁共享资源。Driver 的生命周期由用户管理。
+Drivers may be shared across multiple atoms. Disposing one atom should not destroy a shared resource. Driver lifecycle is user-managed.
 
-### 零运行时依赖
+### Zero Runtime Dependencies
 
-包括 IndexedDB driver 在内的所有功能均自实现，不引入 `idb-keyval` 等外部依赖。核心逻辑约 100 行，保持库的轻量定位。
+All functionality including the IndexedDB driver is self-implemented, without external dependencies like `idb-keyval`. Core logic is ~100 lines, maintaining the library's lightweight positioning.
 
-### 错误处理策略
+### Error Handling Strategy
 
-中间件或 driver 抛出的异常同时通过两个通道传播：
+Exceptions from middleware or drivers propagate through two channels:
 
-1. **throw** — 调用者可 `try-catch` 捕获
-2. **error 事件** — 通过 EventTarget 派发，供全局监听
+1. **throw** — callers can `try-catch`
+2. **error event** — dispatched via EventTarget for global listeners
 
-降级链中所有 driver 全部失败时，抛出 `StorageError`。
+When all drivers in the degradation chain fail, a `StorageError` is thrown.
 
-## 非目标
+## Non-Goals
 
-以下明确不在 atorage 范围内：
+The following are explicitly out of scope:
 
-- **状态管理** — 不做 computed / derived atom，这是 Jotai / Zustand 的职责
-- **框架绑定** — 不内置 React / Vue hook，用户或社区通过 `EventTarget` 对接
-- **配额管理 / LRU** — atom 原子化独立，无法跨 atom 决策淘汰；存储满时由 driver 降级链处理
-- **外部变更检测** — 不监听 DevTools 或第三方库对存储的直接修改（无法在所有 driver 上统一实现）
-- **DevTools 浏览器扩展** — 当前版本不做，后续迭代
+- **State management** — no computed / derived atoms; that's the job of Jotai / Zustand
+- **Framework bindings** — no built-in React / Vue hooks; integrate via `EventTarget`
+- **Quota management / LRU** — atoms are independent; cross-atom eviction decisions don't fit the atomic model. Storage full → driver degradation handles it
+- **External change detection** — does not watch DevTools or third-party writes to storage (impossible to unify across all drivers)
+- **DevTools browser extension** — not in current version; planned for future iterations
 
 ## License
 
