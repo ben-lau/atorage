@@ -10,6 +10,7 @@ export default defineConfig({
   },
   format: ['esm', 'cjs'],
   dts: true,
+  tsconfig: 'tsconfig.build.json',
   clean: true,
   outExtension: ({ format }) => ({
     js: format === 'esm' ? '.mjs' : '.cjs',

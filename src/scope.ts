@@ -18,7 +18,11 @@ class ScopeImpl extends EventTarget implements Scope {
   }
 
   async clear(): Promise<void> {
-    this.dispatchEvent(new Event('clear'));
+    try {
+      this.dispatchEvent(new Event('clear'));
+    } catch {
+      /* swallow listener errors */
+    }
     await Promise.all(this._cleaners.map((fn) => fn().catch(() => {})));
   }
 }

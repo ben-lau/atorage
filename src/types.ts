@@ -26,6 +26,13 @@ export interface MiddlewareContext<T = unknown> {
   key: string;
   operation: 'get' | 'set' | 'del' | 'has';
   value?: T;
+  /**
+   * Metadata stored alongside the value. Middleware may read/write arbitrary keys.
+   *
+   * Reserved keys (set by built-in middleware):
+   * - `exp` — expiration timestamp in ms (ttl middleware)
+   * - `v`   — data version number (versioned middleware)
+   */
   meta: Record<string, unknown>;
   requestWriteback(): void;
   requestDelete(): void;

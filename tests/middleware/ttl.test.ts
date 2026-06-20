@@ -120,6 +120,30 @@ describe('ttl middleware', () => {
       a.dispose();
     });
 
+    it('expired has() returns false and removes data from driver', async () => {
+      const { a, driver } = createAtomWithDelete();
+      await a.set('hello');
+      expect(await driver.has('ttl-del-key')).toBe(true);
+
+      vi.advanceTimersByTime(TTL_MS);
+      await expect(a.has()).resolves.toBe(false);
+
+      expect(await driver.has('ttl-del-key')).toBe(false);
+
+      a.dispose();
+    });
+
+    it('non-expired has() does not delete from driver', async () => {
+      const { a, driver } = createAtomWithDelete();
+      await a.set('hello');
+
+      vi.advanceTimersByTime(TTL_MS - 1);
+      await expect(a.has()).resolves.toBe(true);
+      expect(await driver.has('ttl-del-key')).toBe(true);
+
+      a.dispose();
+    });
+
     it('without deleteOnExpire, expired data stays in driver', async () => {
       const driver = memoryDriver();
       const a = atom<string>('ttl-no-del', withDriver(driver), withMiddleware(ttl(TTL_MS)));
