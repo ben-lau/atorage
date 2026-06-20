@@ -8,14 +8,14 @@ import type {
   Middleware,
   MiddlewareContext,
   MiddlewareWithHooks,
-} from './types.js';
-import { AtomDisposedError, StorageError } from './errors.js';
-import { wrap, unwrap } from './core/wrap.js';
-import { AsyncMutex } from './core/mutex.js';
-import { eventBus } from './core/event-bus.js';
-import { executePipeline } from './core/pipeline.js';
-import { degradedGet, degradedSet, degradedDel } from './core/degradation.js';
-import { isBatching, deferEvent, deferBusNotify } from './batch.js';
+} from './types';
+import { AtomDisposedError, StorageError } from './errors';
+import { wrap, unwrap } from './core/wrap';
+import { AsyncMutex } from './core/mutex';
+import { eventBus } from './core/event-bus';
+import { executePipeline } from './core/pipeline';
+import { degradedGet, degradedSet, degradedDel } from './core/degradation';
+import { isBatching, deferEvent, deferBusNotify } from './batch';
 
 let atomIdCounter = 0;
 

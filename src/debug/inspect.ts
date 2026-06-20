@@ -1,5 +1,5 @@
-import type { Driver } from '../types.js';
-import { unwrap } from '../core/wrap.js';
+import type { Driver } from '../types';
+import { unwrap } from '../core/wrap';
 
 export interface InspectResult {
   exists: boolean;

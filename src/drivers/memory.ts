@@ -1,4 +1,4 @@
-import type { BatchOp, Driver } from '../types.js';
+import type { BatchOp, Driver } from '../types';
 
 export function memoryDriver(): Driver {
   const store = new Map<string, unknown>();

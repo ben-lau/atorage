@@ -7,6 +7,8 @@ function createCtx(overrides?: Partial<MiddlewareContext>): MiddlewareContext {
     operation: 'get',
     meta: {},
     requestWriteback: () => {},
+    requestDelete: () => {},
+    reportError: () => {},
     ...overrides,
   };
 }

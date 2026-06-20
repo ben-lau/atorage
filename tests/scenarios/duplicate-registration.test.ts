@@ -5,7 +5,6 @@ import { createScope } from '../../src/scope';
 import { memoryDriver } from '../../src/drivers/memory';
 import { cached } from '../../src/middleware/cached';
 import { eventBus } from '../../src/core/event-bus';
-import type { Driver } from '../../src/types';
 
 describe('Scenario: duplicate registration and multi-instance conflicts', () => {
   afterEach(() => {

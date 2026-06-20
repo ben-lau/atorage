@@ -123,7 +123,8 @@ describe('compress middleware', () => {
     await driver.set('corrupt-key', { $v: 'garbage', $m: { cmp: 1 } });
 
     const errors: Error[] = [];
-    a.addEventListener('error', ((e: CustomEvent) => errors.push(e.detail.error)) as EventListener);
+    a.addEventListener('error', ((e: CustomEvent) =>
+      errors.push(e.detail.error)) as unknown as EventListener);
 
     const val = await a.get();
     expect(val).toBeUndefined();
@@ -149,7 +150,8 @@ describe('compress middleware', () => {
     await driver.set('corrupt-throw', { $v: 'bad', $m: { cmp: 1 } });
 
     const errors: Error[] = [];
-    a.addEventListener('error', ((e: CustomEvent) => errors.push(e.detail.error)) as EventListener);
+    a.addEventListener('error', ((e: CustomEvent) =>
+      errors.push(e.detail.error)) as unknown as EventListener);
 
     const val = await a.get();
     expect(val).toBeUndefined();

@@ -1,4 +1,4 @@
-import type { MiddlewareFunction, MiddlewareWithHooks } from '../types.js';
+import type { MiddlewareFunction, MiddlewareWithHooks } from '../types';
 
 export interface DebounceMiddleware extends MiddlewareWithHooks {
   flush(): Promise<void>;

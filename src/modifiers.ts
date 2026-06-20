@@ -1,4 +1,4 @@
-import type { AtomModifier, Driver, Middleware, Scope } from './types.js';
+import type { AtomModifier, Driver, Middleware, Scope } from './types';
 
 export function withDriver<T = unknown>(driver: Driver | Driver[]): AtomModifier<T> {
   const drivers = Array.isArray(driver) ? driver : [driver];

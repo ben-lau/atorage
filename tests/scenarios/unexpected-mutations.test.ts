@@ -3,7 +3,7 @@ import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
 import { cached } from '../../src/middleware/cached';
 import { eventBus } from '../../src/core/event-bus';
-import type { Driver, MiddlewareFunction } from '../../src/types';
+import type { MiddlewareFunction } from '../../src/types';
 
 describe('Scenario: unexpected mutations and state leaks', () => {
   afterEach(() => {
@@ -223,7 +223,7 @@ describe('Scenario: unexpected mutations and state leaks', () => {
       expect(fromCache).toBe('cached-data');
 
       // Only after clearing cache can you see the real state
-      const cachedMw = a as any; // Cannot access internal middleware instance's clear()
+      // Cannot access internal middleware instance's clear()
       // This exposes the inconsistency of cached under external modification scenarios
 
       a.dispose();

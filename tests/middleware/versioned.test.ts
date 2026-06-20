@@ -170,7 +170,8 @@ describe('versioned middleware', () => {
     );
 
     const errors: Error[] = [];
-    a.addEventListener('error', ((e: CustomEvent) => errors.push(e.detail.error)) as EventListener);
+    a.addEventListener('error', ((e: CustomEvent) =>
+      errors.push(e.detail.error)) as unknown as EventListener);
 
     await expect(a.get()).rejects.toThrow('migration exploded');
     expect(errors.length).toBe(1);

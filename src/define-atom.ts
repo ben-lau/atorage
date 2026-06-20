@@ -1,5 +1,5 @@
-import type { Atom, AtomModifier } from './types.js';
-import { atom } from './atom.js';
+import type { Atom, AtomModifier } from './types';
+import { atom } from './atom';
 
 export function defineAtom(
   factory: (key: string) => AtomModifier<any>[],

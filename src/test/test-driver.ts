@@ -1,4 +1,4 @@
-import type { Driver } from '../types.js';
+import type { Driver } from '../types';
 
 export function testDriver(name: string, createDriver: () => Driver | Promise<Driver>): void {
   describe(`Driver conformance: ${name}`, () => {

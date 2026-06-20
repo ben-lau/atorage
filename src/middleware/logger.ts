@@ -1,4 +1,4 @@
-import type { MiddlewareFunction } from '../types.js';
+import type { MiddlewareFunction } from '../types';
 
 export interface LoggerOptions {
   log?: (message: string) => void;

@@ -1,4 +1,4 @@
-import type { MiddlewareFunction } from '../types.js';
+import type { MiddlewareFunction } from '../types';
 
 export interface VersionedConfig {
   current: number;
@@ -23,8 +23,9 @@ export function versioned(config: VersionedConfig): MiddlewareFunction {
       if (storedVer < config.current) {
         let data = ctx.value;
         for (let v = storedVer; v < config.current; v++) {
-          if (config.migrate[v]) {
-            data = config.migrate[v](data);
+          const migrateFn = config.migrate[v];
+          if (migrateFn) {
+            data = migrateFn(data);
           } else {
             throw new Error(`Missing migration for version ${v} → ${v + 1} (key: "${ctx.key}")`);
           }

@@ -1,9 +1,9 @@
 import { atom } from '../../src/atom';
-import { withDriver, withMiddleware } from '../../src/modifiers';
+import { withDriver } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
 import { StorageError } from '../../src/errors';
 import { eventBus } from '../../src/core/event-bus';
-import type { Driver, MiddlewareFunction } from '../../src/types';
+import type { Driver } from '../../src/types';
 
 function createFlakyDriver(
   name: string,
@@ -29,41 +29,6 @@ function createFlakyDriver(
       return store.has(key);
     },
     async keys() {
-      return [...store.keys()];
-    },
-    async dispose() {
-      store.clear();
-    },
-  };
-}
-
-function createLatencyDriver(
-  name: string,
-  latencyMs: number,
-): Driver & { store: Map<string, unknown> } {
-  const store = new Map<string, unknown>();
-  const delay = () => new Promise((r) => setTimeout(r, latencyMs));
-  return {
-    name,
-    store,
-    async get(key) {
-      await delay();
-      return store.get(key);
-    },
-    async set(key, value) {
-      await delay();
-      store.set(key, value);
-    },
-    async del(key) {
-      await delay();
-      store.delete(key);
-    },
-    async has(key) {
-      await delay();
-      return store.has(key);
-    },
-    async keys() {
-      await delay();
       return [...store.keys()];
     },
     async dispose() {
@@ -129,9 +94,9 @@ describe('Scenario: driver degradation under real conditions', () => {
       } catch (err) {
         expect(err).toBeInstanceOf(StorageError);
         const se = err as StorageError;
-        expect(se.errors.length).toBe(2);
-        expect(se.errors[0].message).toBe('d1 set failed');
-        expect(se.errors[1].message).toBe('d2 set failed');
+        expect(se.errors!.length).toBe(2);
+        expect(se.errors![0].message).toBe('d1 set failed');
+        expect(se.errors![1].message).toBe('d2 set failed');
       }
 
       a.dispose();
@@ -317,12 +282,12 @@ describe('Scenario: driver degradation under real conditions', () => {
     it('driver without available method is treated as available by default', async () => {
       const bare: Driver = {
         name: 'bare',
-        async get(key) {
+        async get(_key) {
           return undefined;
         },
-        async set(key, value) {},
-        async del(key) {},
-        async has(key) {
+        async set(_key, _value) {},
+        async del(_key) {},
+        async has(_key) {
           return false;
         },
         async keys() {
@@ -341,7 +306,6 @@ describe('Scenario: driver degradation under real conditions', () => {
 
   describe('Edge cases', () => {
     it('behavior of all operations when there are zero drivers', async () => {
-      // All drivers filtered by available() can result in zero drivers
       const a = atom<string>(
         'key',
         withDriver({
@@ -376,14 +340,14 @@ describe('Scenario: driver degradation under real conditions', () => {
       let delShouldFail = false;
       const secondary: Driver = {
         name: 'secondary',
-        async get(key) {
+        async get(_key) {
           return undefined;
         },
-        async set(key, value) {},
-        async del(key) {
+        async set(_key, _value) {},
+        async del(_key) {
           if (delShouldFail) throw new Error('cleanup failed');
         },
-        async has(key) {
+        async has(_key) {
           return false;
         },
         async keys() {

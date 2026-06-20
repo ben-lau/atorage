@@ -1,5 +1,4 @@
 import { atom } from '../../src/atom';
-import { defineAtom } from '../../src/define-atom';
 import { batch } from '../../src/batch';
 import { withDriver, withMiddleware, withScope } from '../../src/modifiers';
 import { createScope } from '../../src/scope';

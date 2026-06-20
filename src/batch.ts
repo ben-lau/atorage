@@ -1,4 +1,4 @@
-import { eventBus } from './core/event-bus.js';
+import { eventBus } from './core/event-bus';
 
 interface DeferredBusNotify {
   sourceAtomId: string;

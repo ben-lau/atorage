@@ -1,5 +1,5 @@
-import type { MiddlewareFunction, MiddlewareWithHooks } from '../types.js';
-import { eventBus } from '../core/event-bus.js';
+import type { MiddlewareFunction, MiddlewareWithHooks } from '../types';
+import { eventBus } from '../core/event-bus';
 
 export function tabSync(channel?: string): MiddlewareWithHooks {
   let bc: BroadcastChannel | null = null;

@@ -1,4 +1,4 @@
-import type { BatchOp, Driver } from '../types.js';
+import type { BatchOp, Driver } from '../types';
 
 export interface IndexedDBDriverOptions {
   dbName?: string; // default: 'atorage'

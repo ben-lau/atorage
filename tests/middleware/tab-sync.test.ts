@@ -36,7 +36,7 @@ describe('tabSync middleware', () => {
     messages.length = 0;
     closedChannels.length = 0;
     channelInstances.length = 0;
-    globalThis.BroadcastChannel = MockBroadcastChannel as typeof BroadcastChannel;
+    globalThis.BroadcastChannel = MockBroadcastChannel as unknown as typeof BroadcastChannel;
   });
 
   function createAtom(key = 'tab-sync-key', channel?: string) {

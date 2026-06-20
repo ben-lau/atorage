@@ -1,4 +1,4 @@
-import type { Scope } from './types.js';
+import type { Scope } from './types';
 
 class ScopeImpl extends EventTarget implements Scope {
   readonly name: string;

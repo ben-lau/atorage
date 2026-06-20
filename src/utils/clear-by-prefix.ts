@@ -1,4 +1,4 @@
-import type { Driver } from '../types.js';
+import type { Driver } from '../types';
 
 export interface ClearByPrefixOptions {
   driver: Driver;

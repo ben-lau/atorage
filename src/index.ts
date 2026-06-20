@@ -1,10 +1,10 @@
-export { atom } from './atom.js';
-export { batch } from './batch.js';
-export { defineAtom } from './define-atom.js';
-export { createScope } from './scope.js';
-export { withDriver, withScope, withMiddleware, withPreMiddleware } from './modifiers.js';
+export { atom } from './atom';
+export { batch } from './batch';
+export { defineAtom } from './define-atom';
+export { createScope } from './scope';
+export { withDriver, withScope, withMiddleware, withPreMiddleware } from './modifiers';
 
-export { AtomDisposedError, StorageError } from './errors.js';
+export { AtomDisposedError, StorageError } from './errors';
 
 export type {
   Atom,
@@ -20,7 +20,7 @@ export type {
   MiddlewareContext,
   MiddlewareNext,
   Scope,
-} from './types.js';
+} from './types';
 
-export { snapshot, restore, clearByPrefix } from './utils/index.js';
-export type { SnapshotOptions, RestoreOptions, ClearByPrefixOptions } from './utils/index.js';
+export { snapshot, restore, clearByPrefix } from './utils/index';
+export type { SnapshotOptions, RestoreOptions, ClearByPrefixOptions } from './utils/index';

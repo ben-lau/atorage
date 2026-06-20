@@ -1,5 +1,5 @@
-import type { Driver } from '../types.js';
-import { StorageError } from '../errors.js';
+import type { Driver } from '../types';
+import { StorageError } from '../errors';
 
 export async function degradedGet(drivers: Driver[], key: string): Promise<unknown> {
   const errors: Error[] = [];
@@ -22,11 +22,12 @@ export async function degradedGet(drivers: Driver[], key: string): Promise<unkno
 export async function degradedSet(drivers: Driver[], key: string, value: unknown): Promise<void> {
   const errors: Error[] = [];
   for (let i = 0; i < drivers.length; i++) {
+    const driver = drivers[i]!;
     try {
-      await drivers[i].set(key, value);
+      await driver.set(key, value);
       for (let j = 0; j < drivers.length; j++) {
         if (j !== i) {
-          await drivers[j].del(key).catch(() => {});
+          await drivers[j]!.del(key).catch(() => {});
         }
       }
       return;

@@ -40,47 +40,6 @@ function slowDriver(delayMs: number): Driver {
   };
 }
 
-function intermittentDriver(): Driver & { failNext: () => void } {
-  const store = new Map<string, unknown>();
-  let shouldFail = false;
-  return {
-    name: 'intermittent',
-    failNext() {
-      shouldFail = true;
-    },
-    async get(key) {
-      if (shouldFail) {
-        shouldFail = false;
-        throw new Error('intermittent read failure');
-      }
-      return store.get(key);
-    },
-    async set(key, value) {
-      if (shouldFail) {
-        shouldFail = false;
-        throw new Error('intermittent write failure');
-      }
-      store.set(key, value);
-    },
-    async del(key) {
-      if (shouldFail) {
-        shouldFail = false;
-        throw new Error('intermittent del failure');
-      }
-      store.delete(key);
-    },
-    async has(key) {
-      return store.has(key);
-    },
-    async keys() {
-      return [...store.keys()];
-    },
-    async dispose() {
-      store.clear();
-    },
-  };
-}
-
 describe('Scenario: race conditions and concurrency', () => {
   afterEach(() => {
     eventBus._clear();

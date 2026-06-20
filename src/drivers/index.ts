@@ -1,5 +1,5 @@
-export { memoryDriver } from './memory.js';
-export { localStorageDriver } from './local-storage.js';
-export { sessionStorageDriver } from './session-storage.js';
-export { indexedDBDriver } from './indexed-db.js';
-export type { IndexedDBDriverOptions } from './indexed-db.js';
+export { memoryDriver } from './memory';
+export { localStorageDriver } from './local-storage';
+export { sessionStorageDriver } from './session-storage';
+export { indexedDBDriver } from './indexed-db';
+export type { IndexedDBDriverOptions } from './indexed-db';

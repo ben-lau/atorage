@@ -1,4 +1,4 @@
-import type { Driver } from '../types.js';
+import type { Driver } from '../types';
 
 export const raw = {
   async get(driver: Driver, key: string): Promise<unknown> {

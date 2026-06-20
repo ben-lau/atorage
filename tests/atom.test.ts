@@ -1,5 +1,5 @@
 import { atom } from '../src/atom';
-import { withDriver, withScope, withMiddleware, withPreMiddleware } from '../src/modifiers';
+import { withDriver, withScope, withMiddleware } from '../src/modifiers';
 import { createScope } from '../src/scope';
 import { memoryDriver } from '../src/drivers/memory';
 import { AtomDisposedError } from '../src/errors';

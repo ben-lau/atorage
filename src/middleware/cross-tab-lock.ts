@@ -1,4 +1,4 @@
-import type { MiddlewareFunction } from '../types.js';
+import type { MiddlewareFunction } from '../types';
 
 export interface CrossTabLockOptions {
   timeout?: number; // milliseconds, default: 5000

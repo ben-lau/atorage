@@ -1,4 +1,4 @@
-import type { MiddlewareWithHooks, MiddlewareFunction } from '../types.js';
+import type { MiddlewareWithHooks, MiddlewareFunction } from '../types';
 
 export interface CachedMiddleware extends MiddlewareWithHooks {
   clear(): void;
