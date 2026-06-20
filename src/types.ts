@@ -49,7 +49,9 @@ export type Middleware = MiddlewareFunction | MiddlewareWithHooks;
 
 export interface Scope extends EventTarget {
   readonly name: string;
-  clear(): void;
+  clear(): Promise<void>;
+  /** @internal */
+  _register(cleaner: () => Promise<void>): () => void;
 }
 
 // ── Atom ────────────────────────────────────────────
@@ -59,7 +61,7 @@ export interface Atom<T> extends EventTarget {
 
   get(): Promise<T | undefined>;
   set(value: T): Promise<void>;
-  del(): Promise<T | undefined>;
+  del(): Promise<void>;
   has(): Promise<boolean>;
   update(updater: (prev: T | undefined) => T | Promise<T>): Promise<T>;
 

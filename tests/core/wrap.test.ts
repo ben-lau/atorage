@@ -13,10 +13,10 @@ describe('wrap', () => {
     expect(wrap('hello', {})).not.toHaveProperty('$m');
   });
 
-  it('wraps undefined value', () => {
-    expect(wrap(undefined, {})).toEqual({ $v: undefined });
+  it('wraps undefined value as null', () => {
+    expect(wrap(undefined, {})).toEqual({ $v: null });
     expect(wrap(undefined, { exp: 1 })).toEqual({
-      $v: undefined,
+      $v: null,
       $m: { exp: 1 },
     });
   });

@@ -112,14 +112,14 @@ describe('async available()', () => {
     a.dispose();
   });
 
-  it('all drivers unavailable → set throws, get returns undefined', async () => {
+  it('all drivers unavailable → all operations throw', async () => {
     const d1 = wrapDriver(trackingDriver('d1'), () => false, 'd1');
     const d2 = wrapDriver(trackingDriver('d2'), () => Promise.resolve(false), 'd2');
 
     const a = atom<string>('all-unavail', withDriver([d1, d2]));
 
-    await expect(a.set('lost')).rejects.toThrow('All drivers failed on set');
-    await expect(a.get()).resolves.toBeUndefined();
+    await expect(a.set('lost')).rejects.toThrow(/no available drivers/);
+    await expect(a.get()).rejects.toThrow(/no available drivers/);
 
     a.dispose();
   });

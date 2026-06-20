@@ -45,6 +45,52 @@ describe('degradedGet', () => {
 
     expect(result).toBe('from-second');
   });
+
+  it('primary throws, fallback returns undefined → returns undefined (partial error is silent)', async () => {
+    const primary = failingDriver('primary');
+    const fallback = memoryDriver();
+
+    const result = await degradedGet([primary, fallback], 'missing');
+
+    expect(result).toBeUndefined();
+  });
+
+  it('primary returns undefined, fallback throws → returns undefined (healthy driver answered)', async () => {
+    const primary = memoryDriver();
+    const fallback = failingDriver('fallback');
+
+    const result = await degradedGet([primary, fallback], 'missing');
+
+    expect(result).toBeUndefined();
+  });
+
+  it('3 drivers: middle returns undefined, outer two throw → returns undefined', async () => {
+    const d1 = failingDriver('d1');
+    const d2 = memoryDriver();
+    const d3 = failingDriver('d3');
+
+    const result = await degradedGet([d1, d2, d3], 'missing');
+
+    expect(result).toBeUndefined();
+  });
+
+  it('primary throws, fallback has value → returns fallback value (degradation works)', async () => {
+    const primary = failingDriver('primary');
+    const fallback = memoryDriver();
+    await fallback.set('key', 'fallback-data');
+
+    const result = await degradedGet([primary, fallback], 'key');
+
+    expect(result).toBe('fallback-data');
+  });
+
+  it('all drivers throw → throws StorageError with all errors', async () => {
+    const d1 = failingDriver('d1');
+    const d2 = failingDriver('d2');
+    const d3 = failingDriver('d3');
+
+    await expect(degradedGet([d1, d2, d3], 'key')).rejects.toThrow(StorageError);
+  });
 });
 
 describe('degradedSet', () => {

@@ -41,10 +41,9 @@ describe('logger middleware', () => {
     await a.set('value');
     await a.del();
 
-    expect(log).toHaveBeenCalledTimes(3);
+    expect(log).toHaveBeenCalledTimes(2);
     expect(log.mock.calls[0][0]).toContain('set ops-key');
-    expect(log.mock.calls[1][0]).toContain('get ops-key');
-    expect(log.mock.calls[2][0]).toContain('del ops-key');
+    expect(log.mock.calls[1][0]).toContain('del ops-key');
 
     a.dispose();
   });

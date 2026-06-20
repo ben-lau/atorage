@@ -61,18 +61,10 @@ describe('atom', () => {
       a.dispose();
     });
 
-    it('del returns the old value', async () => {
+    it('del resolves without returning a value', async () => {
       const a = atom('foo', withDriver(memoryDriver()));
 
       await a.set('hello');
-      await expect(a.del()).resolves.toBe('hello');
-
-      a.dispose();
-    });
-
-    it('del returns undefined when key does not exist', async () => {
-      const a = atom('missing', withDriver(memoryDriver()));
-
       await expect(a.del()).resolves.toBeUndefined();
 
       a.dispose();
@@ -377,11 +369,7 @@ describe('atom', () => {
       await a.set('data');
       await expect(a.has()).resolves.toBe(true);
 
-      const deleted = new Promise<void>((resolve) => {
-        a.addEventListener('delete', () => resolve(), { once: true });
-      });
-      scope.clear();
-      await deleted;
+      await scope.clear();
 
       await expect(a.has()).resolves.toBe(false);
       await expect(driver.get('app:user')).resolves.toBeUndefined();
@@ -397,7 +385,7 @@ describe('atom', () => {
       await a.set('data');
       a.dispose();
 
-      scope.clear();
+      await scope.clear();
 
       const stored = await driver.get('app:user');
       expect(stored).toEqual({ $v: 'data' });

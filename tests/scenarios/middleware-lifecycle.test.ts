@@ -312,14 +312,9 @@ describe('Scenario: middleware lifecycle and state management', () => {
       await a.set('value');
       operations.length = 0;
 
-      const deleted = new Promise<void>((r) =>
-        a.addEventListener('delete', () => r(), { once: true }),
-      );
-      scope.clear();
-      await deleted;
+      await scope.clear();
 
       // scope clear -> atom.del() -> middleware executes
-      expect(operations).toContain('get'); // del reads old value first
       expect(operations).toContain('del');
 
       a.dispose();

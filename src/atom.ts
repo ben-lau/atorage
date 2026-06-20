@@ -9,7 +9,7 @@ import type {
   MiddlewareContext,
   MiddlewareWithHooks,
 } from './types.js';
-import { AtomDisposedError } from './errors.js';
+import { AtomDisposedError, StorageError } from './errors.js';
 import { wrap, unwrap } from './core/wrap.js';
 import { AsyncMutex } from './core/mutex.js';
 import { eventBus } from './core/event-bus.js';
@@ -77,16 +77,15 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     }
   }
 
-  async del(): Promise<T | undefined> {
+  async del(): Promise<void> {
     this._ensureAlive();
     try {
-      const oldValue = await this._doGet();
       const errors: Error[] = [];
 
       const ctx: MiddlewareContext = {
         key: this.key,
         operation: 'del',
-        value: oldValue,
+        value: undefined,
         meta: {},
         requestWriteback: () => {},
         requestDelete: () => {},
@@ -103,7 +102,6 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
       });
 
       for (const err of errors) this._dispatchError(err);
-      return oldValue as T | undefined;
     } catch (err) {
       this._dispatchError(err instanceof Error ? err : new Error(String(err)));
       throw err;
@@ -192,6 +190,11 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
 
   private async _ensureDrivers(): Promise<void> {
     await this._driversReady;
+    if (this._drivers.length === 0) {
+      throw new StorageError(
+        `Atom "${this.key}" has no available drivers. Did you forget withDriver()?`,
+      );
+    }
   }
 
   private async _doGet(): Promise<T | undefined> {
@@ -319,15 +322,14 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
 
   private _registerScopes(scopes: AtomConfig<T>['scopes']): void {
     for (const scope of scopes) {
-      const handler = () => {
+      const cleanup = scope._register(async () => {
         if (!this._disposed) {
-          this.del().catch((err) => {
+          await this.del().catch((err) => {
             this._dispatchError(err instanceof Error ? err : new Error(String(err)));
           });
         }
-      };
-      scope.addEventListener('clear', handler);
-      this._scopeCleanups.push(() => scope.removeEventListener('clear', handler));
+      });
+      this._scopeCleanups.push(cleanup);
     }
   }
 
@@ -363,7 +365,11 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     if (isBatching()) {
       deferEvent(this.key, this._atomId, this, event);
     } else {
-      this.dispatchEvent(event);
+      try {
+        this.dispatchEvent(event);
+      } catch {
+        // Listener errors must not propagate to the caller of set/del
+      }
     }
   }
 
@@ -372,7 +378,11 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     if (isBatching()) {
       deferEvent(this.key, this._atomId, this, event);
     } else {
-      this.dispatchEvent(event);
+      try {
+        this.dispatchEvent(event);
+      } catch {
+        // Listener errors must not propagate to the caller of set/del
+      }
     }
   }
 

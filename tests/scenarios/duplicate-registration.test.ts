@@ -163,7 +163,7 @@ describe('Scenario: duplicate registration and multi-instance conflicts', () => 
   describe('Pitfalls of shared defineAtom configuration', () => {
     it('shared stateful middleware in defineAtom causes cross-instance interference', async () => {
       const sharedCache = cached();
-      const create = defineAtom(withDriver(memoryDriver()), withMiddleware(sharedCache));
+      const create = defineAtom(() => [withDriver(memoryDriver()), withMiddleware(sharedCache)]);
 
       const a1 = create<string>('a');
       const a2 = create<string>('b');
@@ -186,7 +186,7 @@ describe('Scenario: duplicate registration and multi-instance conflicts', () => 
 
     it('instances from multiple defineAtom calls should be isolated from each other', async () => {
       const driver = memoryDriver();
-      const create = defineAtom(withDriver(driver));
+      const create = defineAtom(() => [withDriver(driver)]);
 
       const instances = Array.from({ length: 10 }, (_, i) => create<number>(`counter-${i}`));
 
@@ -210,13 +210,7 @@ describe('Scenario: duplicate registration and multi-instance conflicts', () => 
 
       await Promise.all(atoms.map((a, i) => a.set(`val-${i}`)));
 
-      const allDeleted = Promise.all(
-        atoms.map(
-          (a) => new Promise<void>((r) => a.addEventListener('delete', () => r(), { once: true })),
-        ),
-      );
-      scope.clear();
-      await allDeleted;
+      await scope.clear();
 
       for (const a of atoms) {
         expect(await a.has()).toBe(false);
@@ -235,11 +229,7 @@ describe('Scenario: duplicate registration and multi-instance conflicts', () => 
       // key prefix should not duplicate: 'app:app:key' vs 'app:key'
       expect(a.key).toBe('app:key');
 
-      const deleted = new Promise<void>((r) =>
-        a.addEventListener('delete', () => r(), { once: true }),
-      );
-      scope.clear();
-      await deleted;
+      await scope.clear();
 
       expect(await a.has()).toBe(false);
 

@@ -144,7 +144,7 @@ describe('Scenario: driver degradation under real conditions', () => {
 
       await a.set('value');
       // del should succeed (degradedDel ignores individual driver errors)
-      await expect(a.del()).resolves.toBe('value');
+      await expect(a.del()).resolves.toBeUndefined();
 
       a.dispose();
     });
@@ -362,14 +362,11 @@ describe('Scenario: driver degradation under real conditions', () => {
         }),
       );
 
-      // get from empty drivers list → returns undefined
-      expect(await a.get()).toBeUndefined();
-      // has → false
-      expect(await a.has()).toBe(false);
-      // set → StorageError (all drivers failed, but actually 0 drivers)
-      await expect(a.set('value')).rejects.toThrow();
-      // del → silent (no driver to delete from)
-      await expect(a.del()).resolves.toBeUndefined();
+      // All operations throw StorageError with clear message
+      await expect(a.get()).rejects.toThrow(/no available drivers/);
+      await expect(a.has()).rejects.toThrow(/no available drivers/);
+      await expect(a.set('value')).rejects.toThrow(/no available drivers/);
+      await expect(a.del()).rejects.toThrow(/no available drivers/);
 
       a.dispose();
     });

@@ -142,7 +142,7 @@ describe('Scenario: unexpected mutations and state leaks', () => {
       a.dispose();
     });
 
-    it('middleware setting value to undefined during set causes driver to store undefined', async () => {
+    it('middleware setting value to undefined during set causes driver to store null', async () => {
       const nullifier: MiddlewareFunction = async (ctx, next) => {
         if (ctx.operation === 'set') {
           ctx.value = undefined;
@@ -156,13 +156,13 @@ describe('Scenario: unexpected mutations and state leaks', () => {
       await a.set('something');
 
       const raw = await driver.get('key');
-      // wrap(undefined, {}) -> { $v: undefined }
-      expect(raw).toEqual({ $v: undefined });
+      // wrap(undefined, {}) -> { $v: null } (undefined converted to null for JSON safety)
+      expect(raw).toEqual({ $v: null });
 
-      // get unwraps to undefined
-      expect(await a.get()).toBeUndefined();
-      // has is based on value !== undefined
-      expect(await a.has()).toBe(false);
+      // get unwraps to null (not undefined) — key exists with null value
+      expect(await a.get()).toBeNull();
+      // has returns true because the key exists in the driver
+      expect(await a.has()).toBe(true);
 
       a.dispose();
     });
