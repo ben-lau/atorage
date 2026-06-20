@@ -29,7 +29,11 @@ class EventBus {
 
     for (const [atomId, callback] of keyListeners) {
       if (atomId !== sourceAtomId) {
-        callback(event);
+        try {
+          callback(event);
+        } catch {
+          /* swallow listener errors */
+        }
       }
     }
   }

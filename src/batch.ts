@@ -46,42 +46,28 @@ export async function batch(fn: () => Promise<void> | void): Promise<void> {
     deferredBusNotify: new Map(),
   };
 
-  let fnError: unknown;
   try {
     await fn();
-  } catch (err) {
-    fnError = err;
-  }
+  } finally {
+    const events = currentBatch.deferredEvents;
+    const busNotify = currentBatch.deferredBusNotify;
+    currentBatch = null;
 
-  const events = currentBatch.deferredEvents;
-  const busNotify = currentBatch.deferredBusNotify;
-  currentBatch = null;
-
-  const dispatchErrors: Error[] = [];
-
-  for (const [key, { sourceAtomId, event }] of busNotify) {
-    try {
-      const atomKey = key.substring(sourceAtomId.length + 1);
-      eventBus.notify(atomKey, sourceAtomId, event);
-    } catch (err) {
-      dispatchErrors.push(err instanceof Error ? err : new Error(String(err)));
+    for (const [key, { sourceAtomId, event }] of busNotify) {
+      try {
+        const atomKey = key.substring(sourceAtomId.length + 1);
+        eventBus.notify(atomKey, sourceAtomId, event);
+      } catch {
+        /* swallow listener errors, consistent with non-batch path */
+      }
     }
-  }
 
-  for (const [, { atom, event }] of events) {
-    try {
-      atom.dispatchEvent(event);
-    } catch (err) {
-      dispatchErrors.push(err instanceof Error ? err : new Error(String(err)));
+    for (const [, { atom, event }] of events) {
+      try {
+        atom.dispatchEvent(event);
+      } catch {
+        /* swallow listener errors, consistent with non-batch path */
+      }
     }
-  }
-
-  const allErrors: unknown[] = [];
-  if (fnError) allErrors.push(fnError);
-  allErrors.push(...dispatchErrors);
-
-  if (allErrors.length === 1) throw allErrors[0];
-  if (allErrors.length > 1) {
-    throw new AggregateError(allErrors, 'Errors during batch');
   }
 }
