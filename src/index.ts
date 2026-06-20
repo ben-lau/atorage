@@ -12,6 +12,7 @@ export type {
   AtomConfig,
   AtomChangeEventDetail,
   AtomErrorEventDetail,
+  ClearResult,
   Driver,
   BatchOp,
   Middleware,

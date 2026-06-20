@@ -4,7 +4,7 @@ pre-commit:
     lint:
       glob: '*.{ts,tsx,js,jsx}'
       exclude: 'dist|node_modules|coverage'
-      run: pnpm exec oxlint --fix {staged_files}
+      run: pnpm exec oxlint --fix --deny-warnings {staged_files}
       stage_fixed: true
     format:
       glob: '*.{ts,tsx,js,jsx,json}'

@@ -54,9 +54,14 @@ export type Middleware = MiddlewareFunction | MiddlewareWithHooks;
 
 // ── Scope ───────────────────────────────────────────
 
+export interface ClearResult {
+  /** Errors from individual atom deletions that failed. Empty means full success. */
+  errors: Error[];
+}
+
 export interface Scope extends EventTarget {
   readonly name: string;
-  clear(): Promise<void>;
+  clear(): Promise<ClearResult>;
   /** @internal */
   _register(cleaner: () => Promise<void>): () => void;
 }

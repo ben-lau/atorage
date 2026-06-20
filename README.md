@@ -40,7 +40,7 @@ const token = atom<string>('auth-token', withDriver(localStorageDriver()));
 await token.set('abc123');
 console.log(await token.get()); // 'abc123'
 console.log(await token.has()); // true
-await token.del(); // returns 'abc123'
+await token.del();
 ```
 
 ## Table of Contents
@@ -91,7 +91,7 @@ interface Atom<T> extends EventTarget {
 
   get(): Promise<T | undefined>;
   set(value: T): Promise<void>;
-  del(): Promise<T | undefined>;
+  del(): Promise<void>;
   has(): Promise<boolean>;
   update(updater: (prev: T | undefined) => T | Promise<T>): Promise<T>;
   getMeta(): Promise<Record<string, unknown> | undefined>;
@@ -103,7 +103,7 @@ interface Atom<T> extends EventTarget {
 | ------------ | ------------------------------------------------------------------------------------------------------------- |
 | `get()`      | Read from driver through the middleware chain. No caching by default; enable `cached()` for in-memory caching |
 | `set(value)` | Write to driver through the middleware chain. Dispatches `change` event on success                            |
-| `del()`      | Delete value and associated metadata, returns the deleted value. Internally calls `get()` first               |
+| `del()`      | Delete value and associated metadata. Dispatches `delete` event on success                                    |
 | `has()`      | Check if value exists. Runs through the full middleware chain — TTL-expired keys return `false`               |
 | `update(fn)` | Atomic read-modify-write. Internal serial queue ensures concurrency safety. Supports async updaters           |
 | `getMeta()`  | Read persisted metadata (TTL expiry, version number, etc.). Read-only, for debugging                          |
@@ -134,10 +134,10 @@ import { defineAtom, withDriver, withMiddleware } from 'atorage';
 import { localStorageDriver } from 'atorage/drivers';
 import { encrypt } from 'atorage/middleware';
 
-const secureAtom = defineAtom(
+const secureAtom = defineAtom(() => [
   withDriver(localStorageDriver()),
   withMiddleware(encrypt({ encrypt: myEncrypt, decrypt: myDecrypt })),
-);
+]);
 
 const token = secureAtom<string>('token');
 const refresh = secureAtom<string>(
@@ -147,6 +147,14 @@ const refresh = secureAtom<string>(
 );
 // token   chain: encrypt → driver
 // refresh chain: validate → encrypt → logger → driver
+```
+
+The factory function receives the `key` as its argument, enabling per-key differentiation:
+
+```typescript
+const scopedAtom = defineAtom((key) => [
+  withDriver(key.startsWith('temp:') ? memoryDriver() : localStorageDriver()),
+]);
 ```
 
 ## Drivers (Storage Backends)
@@ -529,8 +537,12 @@ const prefs = atom('prefs', withDriver(d), withScope(userScope));
 const history = atom('history', withDriver(d), withScope(userScope));
 
 // Logout: clear all user data at once
-userScope.clear();
+const { errors } = await userScope.clear();
 // Both prefs and history execute del() (through full middleware chain)
+if (errors.length > 0) {
+  // Some atoms failed to delete; each error corresponds to a failed del()
+  console.warn('Partial clear failure:', errors);
+}
 ```
 
 Multi-level scopes are concatenated by argument order:
@@ -721,13 +733,13 @@ Value and meta are merged into a single structure, stored with a single I/O oper
 
 ## Export Structure
 
-| Import Path          | Contents                                                                                                         |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `atorage`            | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `snapshot`, `restore`, `clearByPrefix` |
-| `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                                  |
-| `atorage/middleware` | All preset middleware                                                                                            |
-| `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                   |
-| `atorage/test`       | `testDriver` — driver conformance testing                                                                        |
+| Import Path          | Contents                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `atorage`            | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `ClearResult`, `snapshot`, `restore`, `clearByPrefix` |
+| `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                                                 |
+| `atorage/middleware` | All preset middleware                                                                                                           |
+| `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                                  |
+| `atorage/test`       | `testDriver` — driver conformance testing                                                                                       |
 
 ## Design Decisions & Trade-offs
 
@@ -758,9 +770,9 @@ Cross-tab sync only broadcasts key + operation type; receivers re-read from the 
 
 Consistent with Express / Koa middleware models. The library does not implicitly reorder, as different scenarios may require different execution orders.
 
-### `del()` Return Value Is Not Atomically Guaranteed
+### `del()` Is Fire-and-Forget
 
-`del()` reads the old value via `get()` before deleting — there's a concurrent write window between the two steps. The returned old value is best-effort. Only `update()` guarantees atomicity through its internal serial queue.
+`del()` deletes the value and metadata without returning the old value. If you need the old value, read it first via `get()` or use `update()` for an atomic read-then-delete pattern.
 
 ### `has()` Reads the Full Value
 
@@ -781,7 +793,9 @@ Exceptions from middleware or drivers propagate through two channels:
 1. **throw** — callers can `try-catch`
 2. **error event** — dispatched via EventTarget for global listeners
 
-When all drivers in the degradation chain fail, a `StorageError` is thrown.
+When all drivers in the degradation chain fail, a `StorageError` is thrown. Partial driver failures (e.g., primary driver throws but fallback succeeds) are reported via the atom's `error` event without interrupting the operation.
+
+`scope.clear()` returns a `ClearResult` containing any errors from individual atom deletions, rather than silently swallowing failures. Each failed atom also dispatches its own `error` event independently.
 
 ## Non-Goals
 

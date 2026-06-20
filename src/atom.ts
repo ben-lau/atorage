@@ -92,7 +92,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     this._ensureAlive();
     return this._run(async () => {
       await this._ensureDrivers();
-      const stored = await degradedGet(this._drivers, this.key);
+      const stored = await degradedGet(this._drivers, this.key, (err) => this._dispatchError(err));
       const { value, meta } = unwrap(stored);
 
       const { ctx, flags, errors } = this._createContext('has', value, meta);
@@ -125,7 +125,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     this._ensureAlive();
     return this._run(async () => {
       await this._ensureDrivers();
-      const stored = await degradedGet(this._drivers, this.key);
+      const stored = await degradedGet(this._drivers, this.key, (err) => this._dispatchError(err));
       if (stored === undefined) return undefined;
       const { meta } = unwrap(stored);
       return Object.keys(meta).length > 0 ? meta : undefined;
@@ -207,7 +207,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
 
     await executePipeline(this._middleware, ctx, async () => {
       await this._ensureDrivers();
-      const stored = await degradedGet(this._drivers, this.key);
+      const stored = await degradedGet(this._drivers, this.key, ctx.reportError);
       const { value, meta } = unwrap(stored);
       ctx.value = value;
       Object.assign(ctx.meta, meta);
@@ -284,9 +284,9 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     for (const scope of scopes) {
       const cleanup = scope._register(async () => {
         if (!this._disposed) {
-          await this.del().catch((err) => {
-            this._dispatchError(err instanceof Error ? err : new Error(String(err)));
-          });
+          // _run() already dispatches the atom 'error' event before rethrowing;
+          // let the error propagate so scope.clear() can observe it via allSettled.
+          await this.del();
         }
       });
       this._scopeCleanups.push(cleanup);

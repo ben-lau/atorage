@@ -1,7 +1,11 @@
 import type { Driver } from '../types';
 import { StorageError } from '../errors';
 
-export async function degradedGet(drivers: Driver[], key: string): Promise<unknown> {
+export async function degradedGet(
+  drivers: Driver[],
+  key: string,
+  onError?: (error: Error) => void,
+): Promise<unknown> {
   const errors: Error[] = [];
   for (const driver of drivers) {
     try {
@@ -10,7 +14,9 @@ export async function degradedGet(drivers: Driver[], key: string): Promise<unkno
         return stored;
       }
     } catch (err) {
-      errors.push(err instanceof Error ? err : new Error(String(err)));
+      const e = err instanceof Error ? err : new Error(String(err));
+      errors.push(e);
+      onError?.(e);
     }
   }
   if (errors.length > 0 && errors.length === drivers.length) {
