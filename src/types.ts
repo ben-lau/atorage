@@ -47,7 +47,7 @@ export interface MiddlewareWithHooks {
   handle: MiddlewareFunction;
   onInit?(context: { key: string; atomId: string }): void;
   onExternalChange?(key: string): void;
-  onDispose?(): void;
+  onDispose?(context: { key: string; atomId: string }): void;
 }
 
 export type Middleware = MiddlewareFunction | MiddlewareWithHooks;

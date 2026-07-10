@@ -145,7 +145,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
 
     for (const mw of this._middleware) {
       if (isMiddlewareWithHooks(mw) && mw.onDispose) {
-        mw.onDispose();
+        mw.onDispose({ key: this.key, atomId: this._atomId });
       }
     }
   }
