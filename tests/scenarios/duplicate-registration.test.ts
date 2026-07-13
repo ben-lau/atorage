@@ -93,7 +93,7 @@ describe('Scenario: duplicate registration and multi-instance conflicts', () => 
       a2.dispose();
     });
 
-    it('same key but different drivers: eventBus still notifies (architectural issue exposed)', async () => {
+    it('same key but different drivers: eventBus does not notify', async () => {
       const driver1 = memoryDriver();
       const driver2 = memoryDriver();
       const a1 = atom<string>('samename', withDriver(driver1));
@@ -106,12 +106,35 @@ describe('Scenario: duplicate registration and multi-instance conflicts', () => 
 
       await a1.set('hello');
 
-      // eventBus uses key to notify - it doesn't distinguish drivers
-      // so a2 gets notified even though its driver has different data
-      expect(changes).toContain('hello');
-
-      // but a2.get() reads from its own driver which has nothing
+      expect(changes).toHaveLength(0);
       expect(await a2.get()).toBeUndefined();
+
+      a1.dispose();
+      a2.dispose();
+    });
+
+    it('degraded set on shared driver chain still notifies peer atoms', async () => {
+      const primary = memoryDriver();
+      const fallback = memoryDriver();
+      const a1 = atom<string>('key', withDriver([primary, fallback]));
+      const a2 = atom<string>('key', withDriver([primary, fallback]));
+      const changes: string[] = [];
+
+      a2.addEventListener('change', (e) => {
+        changes.push((e as CustomEvent).detail.value);
+      });
+
+      // Force fallback by making primary.set fail
+      const originalSet = primary.set.bind(primary);
+      primary.set = async () => {
+        throw new Error('primary down');
+      };
+
+      await a1.set('via-fallback');
+      expect(await a2.get()).toBe('via-fallback');
+      expect(changes).toContain('via-fallback');
+
+      primary.set = originalSet;
 
       a1.dispose();
       a2.dispose();

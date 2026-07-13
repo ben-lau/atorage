@@ -138,14 +138,18 @@ describe('tabSync middleware', () => {
     expect(notifySpy).toHaveBeenCalledWith(
       'test-key',
       expect.stringMatching(/^__cross_tab_.*__$/),
+      [],
       { type: 'delete' },
+      { skipDriverCheck: true },
     );
 
     channel.onmessage!({ data: { type: 'set', key: 'test-key' } } as MessageEvent);
     expect(notifySpy).toHaveBeenCalledWith(
       'test-key',
       expect.stringMatching(/^__cross_tab_.*__$/),
+      [],
       { type: 'change' },
+      { skipDriverCheck: true },
     );
 
     notifySpy.mockRestore();
@@ -180,7 +184,9 @@ describe('tabSync middleware', () => {
       expect(notifySpy).toHaveBeenCalledWith(
         'app:user',
         expect.stringMatching(/^__cross_tab_.*__$/),
+        [],
         { type: 'change' },
+        { skipDriverCheck: true },
       );
 
       notifySpy.mockClear();
@@ -191,7 +197,9 @@ describe('tabSync middleware', () => {
       expect(notifySpy).toHaveBeenCalledWith(
         'app:theme',
         expect.stringMatching(/^__cross_tab_.*__$/),
+        [],
         { type: 'change' },
+        { skipDriverCheck: true },
       );
 
       notifySpy.mockClear();
@@ -231,8 +239,8 @@ describe('tabSync middleware', () => {
 
       const tokenNotifies = notifySpy.mock.calls.filter(([key]) => key === 'session:token');
       expect(tokenNotifies).toHaveLength(2);
-      expect(tokenNotifies[0]?.[2]).toEqual({ type: 'delete' });
-      expect(tokenNotifies[1]?.[2]).toEqual({ type: 'delete' });
+      expect(tokenNotifies[0]?.[3]).toEqual({ type: 'delete' });
+      expect(tokenNotifies[1]?.[3]).toEqual({ type: 'delete' });
 
       notifySpy.mockRestore();
       a1.dispose();
@@ -350,7 +358,9 @@ describe('tabSync middleware', () => {
       expect(notifySpy).toHaveBeenCalledWith(
         'settings',
         expect.stringMatching(/^__cross_tab_.*__$/),
+        [],
         { type: 'change' },
+        { skipDriverCheck: true },
       );
 
       notifySpy.mockClear();

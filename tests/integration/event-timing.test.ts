@@ -55,8 +55,9 @@ describe('event timing', () => {
   describe('batch defers local events and bus notifications', () => {
     it('fires events on both atoms after batch completes', async () => {
       const key = 'batch-bus-key';
-      const atom1 = atom<string>(key, withDriver(memoryDriver()));
-      const atom2 = atom<string>(key, withDriver(memoryDriver()));
+      const driver = memoryDriver();
+      const atom1 = atom<string>(key, withDriver(driver));
+      const atom2 = atom<string>(key, withDriver(driver));
 
       const atom1Events: string[] = [];
       const atom2Events: string[] = [];

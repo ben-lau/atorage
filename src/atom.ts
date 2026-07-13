@@ -54,7 +54,6 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     this._drivers = [...new Set(config.drivers)];
     this._middleware = [...config.preMiddleware, ...config.middleware];
 
-    this._registerEventBus();
     this._registerScopes(scopes);
     this._driversReady = this._filterDrivers();
     this._initMiddleware();
@@ -253,7 +252,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
   }
 
   private _registerEventBus(): void {
-    eventBus.register(this.key, this._atomId, (event) => {
+    eventBus.register(this.key, this._atomId, this._drivers, (event) => {
       if (event.type === 'change') {
         this._dispatchChange(event.value as T | undefined);
         this._callExternalChangeHooks();
@@ -310,6 +309,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
       }
     }
     this._drivers = filtered;
+    this._registerEventBus();
   }
 
   private _ensureAlive(): void {
@@ -345,9 +345,9 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
   private _notifyBus(type: string, value?: unknown): void {
     const event = { type, value };
     if (isBatching()) {
-      deferBusNotify(this.key, this._atomId, event);
+      deferBusNotify(this.key, this._atomId, this._drivers, event);
     } else {
-      eventBus.notify(this.key, this._atomId, event);
+      eventBus.notify(this.key, this._atomId, this._drivers, event);
     }
   }
 

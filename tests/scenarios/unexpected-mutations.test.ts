@@ -285,7 +285,7 @@ describe('Scenario: unexpected mutations and state leaks', () => {
 
       // Can't set after dispose, so simulate via eventBus
       // External notification arrives after atom is disposed
-      eventBus.notify('key', 'fake-source', { type: 'change', value: 'ghost' });
+      eventBus.notify('key', 'fake-source', [], { type: 'change', value: 'ghost' });
 
       // Disposed atom should not respond — it has unregistered
       expect(events).toEqual(['change']);

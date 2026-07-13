@@ -1,7 +1,9 @@
+import type { Driver } from './types';
 import { eventBus } from './core/event-bus';
 
 interface DeferredBusNotify {
   sourceAtomId: string;
+  sourceDrivers: Driver[];
   event: { type: string; value?: unknown };
 }
 
@@ -29,10 +31,15 @@ export function deferEvent(
 export function deferBusNotify(
   atomKey: string,
   sourceAtomId: string,
+  sourceDrivers: Driver[],
   event: { type: string; value?: unknown },
 ): void {
   if (!currentBatch) return;
-  currentBatch.deferredBusNotify.set(`${sourceAtomId}:${atomKey}`, { sourceAtomId, event });
+  currentBatch.deferredBusNotify.set(`${sourceAtomId}:${atomKey}`, {
+    sourceAtomId,
+    sourceDrivers,
+    event,
+  });
 }
 
 export async function batch(fn: () => Promise<void> | void): Promise<void> {
@@ -53,10 +60,10 @@ export async function batch(fn: () => Promise<void> | void): Promise<void> {
     const busNotify = currentBatch.deferredBusNotify;
     currentBatch = null;
 
-    for (const [key, { sourceAtomId, event }] of busNotify) {
+    for (const [key, { sourceAtomId, sourceDrivers, event }] of busNotify) {
       try {
         const atomKey = key.substring(sourceAtomId.length + 1);
-        eventBus.notify(atomKey, sourceAtomId, event);
+        eventBus.notify(atomKey, sourceAtomId, sourceDrivers, event);
       } catch {
         /* swallow listener errors, consistent with non-batch path */
       }

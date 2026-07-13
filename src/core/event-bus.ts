@@ -1,16 +1,32 @@
+import type { Driver } from '../types';
+
 type BusCallback = (event: { type: string; value?: unknown }) => void;
 
-class EventBus {
-  // Map of key -> Map of atomId -> callback
-  private _listeners = new Map<string, Map<string, BusCallback>>();
+interface Listener {
+  callback: BusCallback;
+  drivers: Driver[];
+}
 
-  register(key: string, atomId: string, callback: BusCallback): void {
+export interface NotifyOptions {
+  skipDriverCheck?: boolean;
+}
+
+function sharesDriver(a: Driver[], b: Driver[]): boolean {
+  const set = new Set(b);
+  return a.some((d) => set.has(d));
+}
+
+class EventBus {
+  // Map of key -> Map of atomId -> listener
+  private _listeners = new Map<string, Map<string, Listener>>();
+
+  register(key: string, atomId: string, drivers: Driver[], callback: BusCallback): void {
     let keyListeners = this._listeners.get(key);
     if (!keyListeners) {
       keyListeners = new Map();
       this._listeners.set(key, keyListeners);
     }
-    keyListeners.set(atomId, callback);
+    keyListeners.set(atomId, { callback, drivers });
   }
 
   unregister(key: string, atomId: string): void {
@@ -23,17 +39,23 @@ class EventBus {
     }
   }
 
-  notify(key: string, sourceAtomId: string, event: { type: string; value?: unknown }): void {
+  notify(
+    key: string,
+    sourceAtomId: string,
+    sourceDrivers: Driver[],
+    event: { type: string; value?: unknown },
+    options?: NotifyOptions,
+  ): void {
     const keyListeners = this._listeners.get(key);
     if (!keyListeners) return;
 
-    for (const [atomId, callback] of keyListeners) {
-      if (atomId !== sourceAtomId) {
-        try {
-          callback(event);
-        } catch {
-          /* swallow listener errors */
-        }
+    for (const [atomId, { callback, drivers }] of keyListeners) {
+      if (atomId === sourceAtomId) continue;
+      if (!options?.skipDriverCheck && !sharesDriver(sourceDrivers, drivers)) continue;
+      try {
+        callback(event);
+      } catch {
+        /* swallow listener errors */
       }
     }
   }

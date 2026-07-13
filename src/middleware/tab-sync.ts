@@ -26,7 +26,15 @@ function routeMessage(entry: ChannelEntry, event: MessageEvent): void {
   const type = event.data?.type === 'del' ? 'delete' : 'change';
   for (const sub of entry.subscribers.slice()) {
     if (sub.atomKey === msgKey) {
-      eventBus.notify(sub.atomKey, `__cross_tab_${sub.atomId}__`, { type });
+      eventBus.notify(
+        sub.atomKey,
+        `__cross_tab_${sub.atomId}__`,
+        [],
+        { type },
+        {
+          skipDriverCheck: true,
+        },
+      );
     }
   }
 }
