@@ -8,6 +8,12 @@ export interface BatchOp {
 
 export interface Driver {
   name: string;
+  /**
+   * Identifies the physical storage backend. Drivers sharing the same `backendId`
+   * point at the same underlying store (e.g. two `localStorageDriver()` instances).
+   * Used by the degradation chain to skip stale cleanup that would delete from itself.
+   */
+  backendId?: string;
 
   get(key: string): Promise<unknown>;
   set(key: string, value: unknown): Promise<void>;

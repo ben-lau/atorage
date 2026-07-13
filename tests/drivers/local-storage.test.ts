@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 import { localStorageDriver } from '../../src/drivers/local-storage';
+import { atom } from '../../src/atom';
+import { withDriver } from '../../src/modifiers';
 
 describe('localStorageDriver', () => {
   beforeEach(() => window.localStorage.clear());
@@ -73,5 +75,22 @@ describe('localStorageDriver', () => {
     expect(await driver.get('foo')).toBe('bar');
     expect(await driver.has('foo')).toBe(true);
     expect((await driver.keys()).length).toBe(1);
+  });
+
+  it('exposes a shared backendId across factory instances', () => {
+    const a = localStorageDriver();
+    const b = localStorageDriver();
+    expect(a.backendId).toBe('localStorage');
+    expect(b.backendId).toBe(a.backendId);
+  });
+
+  it('atom with two localStorage drivers does not lose data on set', async () => {
+    const a = atom<string>('dup-ls-key', withDriver([localStorageDriver(), localStorageDriver()]));
+
+    await a.set('hello');
+    expect(await a.get()).toBe('hello');
+    expect(await a.has()).toBe(true);
+
+    a.dispose();
   });
 });

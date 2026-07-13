@@ -1,4 +1,4 @@
-import { degradedGet, degradedSet, degradedDel } from '../../src/core/degradation';
+import { degradedGet, degradedSet, degradedDel, sharesBackend } from '../../src/core/degradation';
 import { memoryDriver } from '../../src/drivers/memory';
 import { StorageError } from '../../src/errors';
 import type { Driver } from '../../src/types';
@@ -123,6 +123,87 @@ describe('degradedSet', () => {
     await expect(degradedSet([driver1, driver2], 'key', 'value')).rejects.toThrow(
       'All drivers failed on set',
     );
+  });
+
+  it('skips stale cleanup when drivers share the same backendId', async () => {
+    const shared = new Map<string, unknown>();
+    function sharedBackendDriver(name: string): Driver {
+      return {
+        name,
+        backendId: 'shared-store',
+        get: (key) => Promise.resolve(shared.get(key)),
+        set: (key, value) => {
+          shared.set(key, value);
+          return Promise.resolve();
+        },
+        del: (key) => {
+          shared.delete(key);
+          return Promise.resolve();
+        },
+        has: (key) => Promise.resolve(shared.has(key)),
+        keys: () => Promise.resolve([...shared.keys()]),
+        dispose: () => Promise.resolve(),
+      };
+    }
+
+    const driver1 = sharedBackendDriver('primary');
+    const driver2 = sharedBackendDriver('secondary');
+
+    await degradedSet([driver1, driver2], 'key', 'persisted');
+
+    expect(await driver1.get('key')).toBe('persisted');
+    expect(shared.size).toBe(1);
+  });
+
+  it('still cleans up drivers with a different backendId', async () => {
+    const shared = new Map<string, unknown>();
+    const isolated = memoryDriver();
+
+    const sharedDriver: Driver = {
+      name: 'shared',
+      backendId: 'shared-store',
+      get: (key) => Promise.resolve(shared.get(key)),
+      set: (key, value) => {
+        shared.set(key, value);
+        return Promise.resolve();
+      },
+      del: (key) => {
+        shared.delete(key);
+        return Promise.resolve();
+      },
+      has: (key) => Promise.resolve(shared.has(key)),
+      keys: () => Promise.resolve([...shared.keys()]),
+      dispose: () => Promise.resolve(),
+    };
+
+    await isolated.set('key', 'stale');
+
+    await degradedSet([sharedDriver, isolated], 'key', 'fresh');
+
+    expect(await sharedDriver.get('key')).toBe('fresh');
+    expect(await isolated.get('key')).toBeUndefined();
+  });
+});
+
+describe('sharesBackend', () => {
+  it('returns true for the same driver instance', () => {
+    const driver = memoryDriver();
+    expect(sharesBackend(driver, driver)).toBe(true);
+  });
+
+  it('returns true when backendId matches', () => {
+    const a: Driver = { ...memoryDriver(), backendId: 'localStorage' };
+    const b: Driver = { ...memoryDriver(), backendId: 'localStorage' };
+    expect(sharesBackend(a, b)).toBe(true);
+  });
+
+  it('returns false for different instances without backendId', () => {
+    expect(sharesBackend(memoryDriver(), memoryDriver())).toBe(false);
+  });
+
+  it('returns false when only one driver has backendId', () => {
+    const withId: Driver = { ...memoryDriver(), backendId: 'a' };
+    expect(sharesBackend(withId, memoryDriver())).toBe(false);
   });
 });
 

@@ -3,6 +3,7 @@ import type { Driver } from '../types';
 export function localStorageDriver(): Driver {
   return {
     name: 'localStorage',
+    backendId: 'localStorage',
 
     available() {
       try {

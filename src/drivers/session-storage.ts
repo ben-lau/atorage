@@ -3,6 +3,7 @@ import type { Driver } from '../types';
 export function sessionStorageDriver(): Driver {
   return {
     name: 'sessionStorage',
+    backendId: 'sessionStorage',
 
     available() {
       try {

@@ -1,6 +1,14 @@
 import type { Driver } from '../types';
 import { StorageError } from '../errors';
 
+export function sharesBackend(a: Driver, b: Driver): boolean {
+  if (a === b) return true;
+  const aId = a.backendId;
+  const bId = b.backendId;
+  if (aId !== undefined && bId !== undefined) return aId === bId;
+  return false;
+}
+
 export async function degradedGet(
   drivers: Driver[],
   key: string,
@@ -32,8 +40,9 @@ export async function degradedSet(drivers: Driver[], key: string, value: unknown
     try {
       await driver.set(key, value);
       for (let j = 0; j < drivers.length; j++) {
-        if (j !== i) {
-          await drivers[j]!.del(key).catch(() => {});
+        const other = drivers[j]!;
+        if (j !== i && !sharesBackend(driver, other)) {
+          await other.del(key).catch(() => {});
         }
       }
       return;

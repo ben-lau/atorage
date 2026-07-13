@@ -44,6 +44,7 @@ export function indexedDBDriver(options?: IndexedDBDriverOptions): Driver {
 
   return {
     name: 'indexedDB',
+    backendId: `indexedDB:${dbName}/${storeName}`,
 
     available() {
       return typeof indexedDB !== 'undefined';
