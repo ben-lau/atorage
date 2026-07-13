@@ -297,6 +297,8 @@ const temp = atom('temp', withDriver(d), withMiddleware(ttl(5000, { deleteOnExpi
 ### validate — Runtime Validation
 
 ```typescript
+import { validate, ValidationError } from 'atorage/middleware';
+
 const age = atom<number>(
   'age',
   withDriver(d),
@@ -304,10 +306,19 @@ const age = atom<number>(
 );
 
 await age.set(-1); // throws ValidationError
+
+try {
+  await age.set(-1);
+} catch (err) {
+  if (err instanceof ValidationError) {
+    // handle invalid write
+  }
+}
 ```
 
 - **Write**: Throws `ValidationError` on validation failure, preventing the write
 - **Read**: Returns `undefined` on validation failure, notifies via `error` event
+- **`ValidationError`** is exported from `atorage/middleware` (not `atorage`) — import it only when using the `validate()` middleware
 
 ### versioned — Version Migration
 
@@ -733,13 +744,13 @@ Value and meta are merged into a single structure, stored with a single I/O oper
 
 ## Export Structure
 
-| Import Path          | Contents                                                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `atorage`            | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `ClearResult`, `snapshot`, `restore`, `clearByPrefix` |
-| `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                                                 |
-| `atorage/middleware` | All preset middleware                                                                                                           |
-| `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                                  |
-| `atorage/test`       | `testDriver` — driver conformance testing                                                                                       |
+| Import Path          | Contents                                                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `atorage`            | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `AtomDisposedError`, `StorageError`, `snapshot`, `restore`, `clearByPrefix` |
+| `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                                                         |
+| `atorage/middleware` | All preset middleware (including `validate`, `ValidationError`, `ttl`, `encrypt`, …)                                                    |
+| `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                                           |
+| `atorage/test`       | `testDriver` — driver conformance testing                                                                                                |
 
 ## Design Decisions & Trade-offs
 
@@ -794,6 +805,8 @@ Exceptions from middleware or drivers propagate through two channels:
 2. **error event** — dispatched via EventTarget for global listeners
 
 When all drivers in the degradation chain fail, a `StorageError` is thrown. Partial driver failures (e.g., primary driver throws but fallback succeeds) are reported via the atom's `error` event without interrupting the operation.
+
+Core errors (`AtomDisposedError`, `StorageError`) are exported from `atorage`. Middleware-specific errors (e.g., `ValidationError` from `validate()`) are exported from `atorage/middleware`.
 
 `scope.clear()` returns a `ClearResult` containing any errors from individual atom deletions, rather than silently swallowing failures. Each failed atom also dispatches its own `error` event independently.
 

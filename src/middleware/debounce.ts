@@ -68,7 +68,7 @@ export function debounce(ms: number): DebounceMiddleware {
       return;
     }
 
-    if (ctx.operation === 'get' && hasPending) {
+    if ((ctx.operation === 'get' || ctx.operation === 'has') && hasPending) {
       ctx.value = pendingValue;
       Object.assign(ctx.meta, pendingMeta);
       return;

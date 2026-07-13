@@ -417,6 +417,25 @@ describe('atom', () => {
 
       a.dispose();
     });
+
+    it('when first driver fails on set but fallback succeeds, dispatches error event', async () => {
+      const driver1 = failingSetDriver();
+      const driver2 = memoryDriver();
+      const a = atom('key', withDriver([driver1, driver2]));
+
+      const errors: Error[] = [];
+      a.addEventListener('error', ((e: CustomEvent) => {
+        errors.push(e.detail.error);
+      }) as EventListener);
+
+      await a.set('fallback');
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toBe('fail');
+      await expect(a.get()).resolves.toBe('fallback');
+
+      a.dispose();
+    });
   });
 
   describe('dispose()', () => {

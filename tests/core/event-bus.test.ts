@@ -77,6 +77,26 @@ describe('eventBus', () => {
     expect(callback2).not.toHaveBeenCalled();
   });
 
+  it('notifies when drivers share the same backendId', () => {
+    const driver1: ReturnType<typeof memoryDriver> = {
+      ...memoryDriver(),
+      backendId: 'localStorage',
+    };
+    const driver2: ReturnType<typeof memoryDriver> = {
+      ...memoryDriver(),
+      backendId: 'localStorage',
+    };
+    const callback = vi.fn();
+
+    eventBus.register('my-key', 'atom-1', [driver1], callback);
+
+    const event = { type: 'change', value: 'x' };
+    eventBus.notify('my-key', 'atom-2', [driver2], event);
+
+    expect(callback).toHaveBeenCalledOnce();
+    expect(callback).toHaveBeenCalledWith(event);
+  });
+
   it('skipDriverCheck notifies all listeners regardless of driver', () => {
     const driver1 = memoryDriver();
     const driver2 = memoryDriver();

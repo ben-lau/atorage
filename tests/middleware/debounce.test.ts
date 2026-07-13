@@ -83,6 +83,37 @@ describe('debounce middleware', () => {
     a.dispose();
   });
 
+  it('has during debounce reflects the pending value', async () => {
+    const { atom: a } = createAtom();
+
+    await expect(a.has()).resolves.toBe(false);
+
+    await a.set('pending');
+    await expect(a.has()).resolves.toBe(true);
+
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    await expect(a.has()).resolves.toBe(true);
+
+    a.dispose();
+  });
+
+  it('has during debounce ignores stale driver data', async () => {
+    const driver = spyDriver();
+    await driver.set('debounce-key', { $v: 'stale' });
+
+    const a = atom<string>(
+      'debounce-key',
+      withDriver(driver),
+      withMiddleware(debounce(DEBOUNCE_MS)),
+    );
+
+    await a.set('pending');
+    await expect(a.has()).resolves.toBe(true);
+    await expect(a.get()).resolves.toBe('pending');
+
+    a.dispose();
+  });
+
   it('del during debounce cancels the pending write', async () => {
     const { atom: a, driver } = createAtom();
 

@@ -234,7 +234,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     await executePipeline(this._middleware, ctx, async () => {
       await this._ensureDrivers();
       const wrapped = wrap(ctx.value, ctx.meta);
-      await degradedSet(this._drivers, this.key, wrapped);
+      await degradedSet(this._drivers, this.key, wrapped, ctx.reportError);
       if (!options?.isWriteback) {
         this._dispatchChange(ctx.value as T | undefined);
         this._notifyBus('change', ctx.value);

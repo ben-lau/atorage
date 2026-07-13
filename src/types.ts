@@ -37,7 +37,7 @@ export interface MiddlewareContext<T = unknown> {
    *
    * Reserved keys (set by built-in middleware):
    * - `exp` — expiration timestamp in ms (ttl middleware)
-   * - `v`   — data version number (versioned middleware)
+   * - `ver` — data version number (versioned middleware)
    */
   meta: Record<string, unknown>;
   requestWriteback(): void;

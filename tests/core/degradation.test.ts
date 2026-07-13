@@ -114,6 +114,28 @@ describe('degradedSet', () => {
     expect(await driver2.get('key')).toBe('value');
   });
 
+  it('reports partial errors via onError when a later driver succeeds', async () => {
+    const driver1 = failingDriver('fail1');
+    const driver2 = memoryDriver();
+    const onError = vi.fn();
+
+    await degradedSet([driver1, driver2], 'key', 'value', onError);
+
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0]![0].message).toBe('fail1 fail');
+    expect(await driver2.get('key')).toBe('value');
+  });
+
+  it('does not call onError when the first driver succeeds', async () => {
+    const driver1 = memoryDriver();
+    const driver2 = memoryDriver();
+    const onError = vi.fn();
+
+    await degradedSet([driver1, driver2], 'key', 'value', onError);
+
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it('throws StorageError when all drivers fail', async () => {
     const driver1 = failingDriver('fail1');
     const driver2 = failingDriver('fail2');

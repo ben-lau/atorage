@@ -1,4 +1,5 @@
 import type { Driver } from '../types';
+import { sharesBackend } from './degradation';
 
 type BusCallback = (event: { type: string; value?: unknown }) => void;
 
@@ -12,8 +13,7 @@ export interface NotifyOptions {
 }
 
 function sharesDriver(a: Driver[], b: Driver[]): boolean {
-  const set = new Set(b);
-  return a.some((d) => set.has(d));
+  return a.some((da) => b.some((db) => sharesBackend(da, db)));
 }
 
 class EventBus {
