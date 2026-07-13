@@ -744,13 +744,13 @@ Value and meta are merged into a single structure, stored with a single I/O oper
 
 ## Export Structure
 
-| Import Path          | Contents                                                                                                                                 |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Import Path          | Contents                                                                                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `atorage`            | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `AtomDisposedError`, `StorageError`, `snapshot`, `restore`, `clearByPrefix` |
-| `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                                                         |
-| `atorage/middleware` | All preset middleware (including `validate`, `ValidationError`, `ttl`, `encrypt`, …)                                                    |
-| `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                                           |
-| `atorage/test`       | `testDriver` — driver conformance testing                                                                                                |
+| `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                                                                       |
+| `atorage/middleware` | All preset middleware (including `validate`, `ValidationError`, `ttl`, `encrypt`, …)                                                                  |
+| `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                                                        |
+| `atorage/test`       | `testDriver` — driver conformance testing                                                                                                             |
 
 ## Design Decisions & Trade-offs
 

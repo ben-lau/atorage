@@ -7,8 +7,8 @@ pre-commit:
       run: pnpm exec oxlint --fix --deny-warnings {staged_files}
       stage_fixed: true
     format:
-      glob: '*.{ts,tsx,js,jsx,json}'
-      exclude: 'dist|node_modules|coverage|pnpm-lock.yaml'
+      glob: '*.{ts,tsx,js,jsx,json,md}'
+      exclude: 'dist|node_modules|coverage|pnpm-lock.yaml|CHANGELOG.md'
       run: pnpm exec oxfmt --write {staged_files}
       stage_fixed: true
 

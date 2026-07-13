@@ -747,13 +747,13 @@ Value 和 meta 合并为一个结构体存储，单次 I/O 读写：
 
 ## 导出结构
 
-| 导入路径             | 内容                                                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 导入路径             | 内容                                                                                                                                                |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `atorage`            | 核心 API：`atom`、`defineAtom`、`createScope`、`batch`、modifier、类型、`AtomDisposedError`、`StorageError`、`snapshot`、`restore`、`clearByPrefix` |
-| `atorage/drivers`    | `memoryDriver`、`localStorageDriver`、`sessionStorageDriver`、`indexedDBDriver`                                                     |
-| `atorage/middleware` | 全部预设中间件（含 `validate`、`ValidationError`、`ttl`、`encrypt` 等）                                                              |
-| `atorage/debug`      | `raw`、`inspect` — 调试工具                                                                                                        |
-| `atorage/test`       | `testDriver` — driver 一致性测试                                                                                                   |
+| `atorage/drivers`    | `memoryDriver`、`localStorageDriver`、`sessionStorageDriver`、`indexedDBDriver`                                                                     |
+| `atorage/middleware` | 全部预设中间件（含 `validate`、`ValidationError`、`ttl`、`encrypt` 等）                                                                             |
+| `atorage/debug`      | `raw`、`inspect` — 调试工具                                                                                                                         |
+| `atorage/test`       | `testDriver` — driver 一致性测试                                                                                                                    |
 
 ## 设计决策与 Trade-offs
 
