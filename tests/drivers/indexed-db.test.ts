@@ -114,4 +114,92 @@ describe('indexedDBDriver', () => {
     });
     db2.close();
   });
+
+  it('same dbName with different storeNames can both read and write', async () => {
+    const dbName = `test-${++counter}`;
+    const kv = indexedDBDriver({ dbName, storeName: 'kv' });
+    const files = indexedDBDriver({ dbName, storeName: 'files' });
+    driver = kv;
+
+    await kv.set('a', 1);
+    await files.set('f', { name: 'x' });
+
+    expect(await kv.get('a')).toBe(1);
+    expect(await files.get('f')).toEqual({ name: 'x' });
+    expect(await kv.get('f')).toBeUndefined();
+    expect(await files.get('a')).toBeUndefined();
+
+    await files.dispose();
+    await kv.dispose();
+  });
+
+  it('concurrent first open of two stores on the same db succeeds', async () => {
+    const dbName = `test-${++counter}`;
+    const kv = indexedDBDriver({ dbName, storeName: 'store-a' });
+    const files = indexedDBDriver({ dbName, storeName: 'store-b' });
+    driver = kv;
+
+    await Promise.all([kv.set('a', 1), files.set('b', 2)]);
+
+    expect(await kv.get('a')).toBe(1);
+    expect(await files.get('b')).toBe(2);
+
+    await files.dispose();
+    await kv.dispose();
+  });
+
+  it('disposing one store driver keeps the other store usable', async () => {
+    const dbName = `test-${++counter}`;
+    const kv = indexedDBDriver({ dbName, storeName: 'kv' });
+    const files = indexedDBDriver({ dbName, storeName: 'files' });
+    driver = kv;
+
+    await kv.set('a', 1);
+    await files.set('f', 2);
+    await kv.dispose();
+
+    expect(await files.get('f')).toBe(2);
+    await files.set('f', 3);
+    expect(await files.get('f')).toBe(3);
+
+    await files.dispose();
+  });
+
+  it('two drivers with the same dbName and storeName share data', async () => {
+    const dbName = `test-${++counter}`;
+    const a = indexedDBDriver({ dbName, storeName: 'kv' });
+    const b = indexedDBDriver({ dbName, storeName: 'kv' });
+    driver = a;
+
+    await a.set('shared', 'yes');
+    expect(await b.get('shared')).toBe('yes');
+
+    await b.dispose();
+    await a.dispose();
+  });
+
+  it('dispose then set reopens the database', async () => {
+    const dbName = `test-${++counter}`;
+    driver = indexedDBDriver({ dbName });
+    await driver.set('foo', 'bar');
+    await driver.dispose();
+    await driver.set('foo', 'baz');
+    expect(await driver.get('foo')).toBe('baz');
+  });
+
+  it('disposing one of two same-store drivers keeps the other usable', async () => {
+    const dbName = `test-${++counter}`;
+    const a = indexedDBDriver({ dbName, storeName: 'kv' });
+    const b = indexedDBDriver({ dbName, storeName: 'kv' });
+    driver = a;
+
+    await a.set('x', 1);
+    await a.dispose();
+
+    expect(await b.get('x')).toBe(1);
+    await b.set('x', 2);
+    expect(await b.get('x')).toBe(2);
+
+    await b.dispose();
+  });
 });

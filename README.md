@@ -186,6 +186,8 @@ interface IndexedDBDriverOptions {
 }
 ```
 
+`dbName` is the IndexedDB database name; `storeName` is an object store (KV partition) inside it. Multiple `storeName`s can share one `dbName` — if a store is missing, the driver bumps the DB version and creates an empty KV store. Driver instances on the same database share one connection; `dispose()` releases this instance's hold and closes the connection when the last holder is idle. Schema versions are managed internally; there is no user-facing `version` option.
+
 **Driver interface** — All drivers accept `unknown` values and handle serialization internally:
 
 - localStorage / sessionStorage: Auto `JSON.stringify` / `JSON.parse`

@@ -188,6 +188,8 @@ interface IndexedDBDriverOptions {
 }
 ```
 
+`dbName` 是 IndexedDB 数据库名，`storeName` 是库内的 object store（KV 分区）。同一 `dbName` 下可以使用不同的 `storeName`；若 store 尚不存在，driver 会自动升版本并创建空 KV store。同库的多个 driver 实例共享底层连接；`dispose()` 释放本实例的占用，最后一个空闲时关闭连接。版本号由库内部管理，无需也不支持手动配置。
+
 **Driver 接口**——所有 driver 接收 `unknown` 类型的值，内部自行处理序列化：
 
 - localStorage / sessionStorage：自动 `JSON.stringify` / `JSON.parse`
