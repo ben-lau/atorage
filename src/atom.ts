@@ -12,10 +12,9 @@ import type {
 import { AtomDisposedError, StorageError } from './errors';
 import { wrap, unwrap } from './core/wrap';
 import { AsyncMutex } from './core/mutex';
-import { eventBus } from './core/event-bus';
 import { executePipeline } from './core/pipeline';
 import { degradedGet, degradedSet, degradedDel } from './core/degradation';
-import { isBatching, deferEvent, deferBusNotify } from './batch';
+import { isBatching, deferEvent } from './batch';
 
 let atomIdCounter = 0;
 
@@ -42,6 +41,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
   private _mutex = new AsyncMutex();
   private _scopeCleanups: Array<() => void> = [];
   private _driversReady: Promise<void>;
+  private _refreshing = false;
 
   constructor(key: string, config: AtomConfig<T>) {
     super();
@@ -55,8 +55,8 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     this._middleware = [...config.preMiddleware, ...config.middleware];
 
     this._registerScopes(scopes);
-    this._driversReady = this._filterDrivers();
     this._initMiddleware();
+    this._driversReady = this._filterDrivers();
   }
 
   // ── Public API ──────────────────────────────────
@@ -80,7 +80,6 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
         await this._ensureDrivers();
         await degradedDel(this._drivers, this.key);
         this._dispatchDelete();
-        this._notifyBus('delete');
       });
 
       this._flushErrors(errors);
@@ -98,9 +97,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
 
       await executePipeline(this._middleware, ctx, async () => {});
 
-      if (flags.delete && ctx.value === undefined) {
-        await this._doSilentDel();
-      }
+      await this._applyReadFlags(ctx, flags);
 
       this._flushErrors(errors);
       return ctx.value !== undefined;
@@ -135,8 +132,6 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     if (this._disposed) return;
     this._disposed = true;
 
-    eventBus.unregister(this.key, this._atomId);
-
     for (const cleanup of this._scopeCleanups) {
       cleanup();
     }
@@ -170,6 +165,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     return {
       ctx: {
         key: this.key,
+        atomId: this._atomId,
         operation,
         value,
         meta: meta ? { ...meta } : {},
@@ -182,6 +178,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
         reportError: (err) => {
           errors.push(err);
         },
+        refresh: () => this._refresh(),
       },
       flags,
       errors,
@@ -201,6 +198,37 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     }
   }
 
+  private async _refresh(): Promise<void> {
+    this._ensureAlive();
+    if (this._refreshing) return;
+    this._refreshing = true;
+    try {
+      await this._run(async () => {
+        const { ctx, flags, errors } = this._createContext('refresh');
+
+        await executePipeline(this._middleware, ctx, async () => {
+          await this._ensureDrivers();
+          const stored = await degradedGet(this._drivers, this.key, ctx.reportError);
+          const { value, meta } = unwrap(stored);
+          ctx.value = value;
+          Object.assign(ctx.meta, meta);
+        });
+
+        await this._applyReadFlags(ctx, flags);
+
+        if (ctx.value === undefined) {
+          this._dispatchDelete();
+        } else {
+          this._dispatchChange(ctx.value as T);
+        }
+
+        this._flushErrors(errors);
+      });
+    } finally {
+      this._refreshing = false;
+    }
+  }
+
   private async _doGet(): Promise<T | undefined> {
     const { ctx, flags, errors } = this._createContext('get');
 
@@ -212,17 +240,24 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
       Object.assign(ctx.meta, meta);
     });
 
-    if (flags.writeback && ctx.value !== undefined) {
-      await this._doSet(ctx.value as T, { meta: ctx.meta, isWriteback: true });
-    }
-
-    if (flags.delete && ctx.value === undefined) {
-      await this._doSilentDel();
-    }
+    await this._applyReadFlags(ctx, flags);
 
     this._flushErrors(errors);
 
     return ctx.value as T | undefined;
+  }
+
+  /** Honor middleware requestWriteback / requestDelete after a read-side pipeline. */
+  private async _applyReadFlags(
+    ctx: MiddlewareContext,
+    flags: { writeback: boolean; delete: boolean },
+  ): Promise<void> {
+    if (flags.writeback && ctx.value !== undefined) {
+      await this._doSet(ctx.value as T, { meta: ctx.meta, isWriteback: true });
+    }
+    if (flags.delete && ctx.value === undefined) {
+      await degradedDel(this._drivers, this.key);
+    }
   }
 
   private async _doSet(
@@ -230,6 +265,9 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     options?: { meta?: Record<string, unknown>; isWriteback?: boolean },
   ): Promise<void> {
     const { ctx, errors } = this._createContext('set', value, options?.meta);
+    if (options?.isWriteback) {
+      ctx.isWriteback = true;
+    }
 
     await executePipeline(this._middleware, ctx, async () => {
       await this._ensureDrivers();
@@ -237,44 +275,20 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
       await degradedSet(this._drivers, this.key, wrapped, ctx.reportError);
       if (!options?.isWriteback) {
         this._dispatchChange(ctx.value as T | undefined);
-        this._notifyBus('change', ctx.value);
       }
     });
 
     this._flushErrors(errors);
   }
 
-  private async _doSilentDel(): Promise<void> {
-    await this._ensureDrivers();
-    for (const driver of this._drivers) {
-      await driver.del(this.key).catch(() => {});
-    }
-  }
-
-  private _registerEventBus(): void {
-    eventBus.register(this.key, this._atomId, this._drivers, (event) => {
-      if (event.type === 'change') {
-        this._dispatchChange(event.value as T | undefined);
-        this._callExternalChangeHooks();
-      } else if (event.type === 'delete') {
-        this._dispatchDelete();
-        this._callExternalChangeHooks();
-      }
-    });
-  }
-
-  private _callExternalChangeHooks(): void {
-    for (const mw of this._middleware) {
-      if (isMiddlewareWithHooks(mw) && mw.onExternalChange) {
-        mw.onExternalChange(this.key);
-      }
-    }
-  }
-
   private _initMiddleware(): void {
     for (const mw of this._middleware) {
       if (isMiddlewareWithHooks(mw) && mw.onInit) {
-        mw.onInit({ key: this.key, atomId: this._atomId });
+        mw.onInit({
+          key: this.key,
+          atomId: this._atomId,
+          refresh: () => this._refresh(),
+        });
       }
     }
   }
@@ -283,8 +297,6 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     for (const scope of scopes) {
       const cleanup = scope._register(async () => {
         if (!this._disposed) {
-          // _run() already dispatches the atom 'error' event before rethrowing;
-          // let the error propagate so scope.clear() can observe it via allSettled.
           await this.del();
         }
       });
@@ -309,7 +321,6 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
       }
     }
     this._drivers = filtered;
-    this._registerEventBus();
   }
 
   private _ensureAlive(): void {
@@ -340,15 +351,6 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
 
   private _dispatchDelete(): void {
     this._safeDispatch(new Event('delete'));
-  }
-
-  private _notifyBus(type: string, value?: unknown): void {
-    const event = { type, value };
-    if (isBatching()) {
-      deferBusNotify(this.key, this._atomId, this._drivers, event);
-    } else {
-      eventBus.notify(this.key, this._atomId, this._drivers, event);
-    }
   }
 
   private _dispatchError(error: Error): void {

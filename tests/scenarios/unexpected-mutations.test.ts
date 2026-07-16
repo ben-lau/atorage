@@ -2,14 +2,9 @@ import { atom } from '../../src/atom';
 import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
 import { cached } from '../../src/middleware/cached';
-import { eventBus } from '../../src/core/event-bus';
 import type { MiddlewareFunction } from '../../src/types';
 
 describe('Scenario: unexpected mutations and state leaks', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   describe('Object reference passthrough — external mutation of stored values', () => {
     it('mutating the original object after set may cause get to return a polluted value', async () => {
       const driver = memoryDriver();
@@ -272,8 +267,10 @@ describe('Scenario: unexpected mutations and state leaks', () => {
     });
 
     it('events still queued after dispose should not fire', async () => {
+      const { sync } = await import('../../src/middleware/sync');
       const driver = memoryDriver();
-      const a = atom<string>('key', withDriver(driver));
+      const a = atom<string>('key', withDriver(driver), withMiddleware(sync()));
+      const b = atom<string>('key', withDriver(driver), withMiddleware(sync()));
       const events: string[] = [];
 
       a.addEventListener('change', () => events.push('change'));
@@ -283,12 +280,11 @@ describe('Scenario: unexpected mutations and state leaks', () => {
 
       a.dispose();
 
-      // Can't set after dispose, so simulate via eventBus
-      // External notification arrives after atom is disposed
-      eventBus.notify('key', 'fake-source', [], { type: 'change', value: 'ghost' });
+      await b.set('ghost');
 
-      // Disposed atom should not respond — it has unregistered
       expect(events).toEqual(['change']);
+
+      b.dispose();
     });
   });
 

@@ -17,7 +17,7 @@ export function validate(validator: (value: unknown) => boolean): MiddlewareFunc
 
     await next();
 
-    if (ctx.operation === 'get' && ctx.value !== undefined) {
+    if ((ctx.operation === 'get' || ctx.operation === 'refresh') && ctx.value !== undefined) {
       if (!validator(ctx.value)) {
         ctx.value = undefined;
         ctx.reportError(new ValidationError(ctx.key));

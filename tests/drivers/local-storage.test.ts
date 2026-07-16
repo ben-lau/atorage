@@ -94,7 +94,7 @@ describe('localStorageDriver', () => {
     a.dispose();
   });
 
-  it('two atoms with separate localStorageDriver instances receive change events', async () => {
+  it('two atoms with separate localStorageDriver instances share storage but not events without sync', async () => {
     const a = atom<string>('sync-key', withDriver(localStorageDriver()));
     const b = atom<string>('sync-key', withDriver(localStorageDriver()));
 
@@ -103,7 +103,7 @@ describe('localStorageDriver', () => {
 
     await b.set('from-b');
 
-    expect(changes).toEqual(['from-b']);
+    expect(changes).toEqual([]);
     expect(await a.get()).toBe('from-b');
 
     a.dispose();

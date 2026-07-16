@@ -2,7 +2,6 @@ import { atom } from '../src/atom';
 import { withDriver, withMiddleware } from '../src/modifiers';
 import { memoryDriver } from '../src/drivers/memory';
 import { cached } from '../src/middleware/cached';
-import { eventBus } from '../src/core/event-bus';
 
 function spyDriver() {
   const driver = memoryDriver();
@@ -18,10 +17,6 @@ function spyDriver() {
 }
 
 describe('cached.clear() (fresh read)', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   it('clear() then get() bypasses cache and reads from driver', async () => {
     const driver = spyDriver();
     const myCache = cached();

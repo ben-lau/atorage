@@ -13,7 +13,7 @@ export function versioned(config: VersionedConfig): MiddlewareFunction {
 
     await next();
 
-    if (ctx.operation === 'get' && ctx.value !== undefined) {
+    if ((ctx.operation === 'get' || ctx.operation === 'refresh') && ctx.value !== undefined) {
       const storedVer = typeof ctx.meta.ver === 'number' ? ctx.meta.ver : 0;
       if (storedVer > config.current) {
         throw new Error(

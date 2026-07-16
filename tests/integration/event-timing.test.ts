@@ -3,7 +3,7 @@ import { batch } from '../../src/batch';
 import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
 import { debounce } from '../../src/middleware/debounce';
-import { eventBus } from '../../src/core/event-bus';
+import { sync } from '../../src/middleware/sync';
 import type { Driver } from '../../src/types';
 
 const DEBOUNCE_MS = 100;
@@ -17,10 +17,6 @@ function failingSetDriver(): Driver {
 }
 
 describe('event timing', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   describe('debounce change events', () => {
     beforeEach(() => {
       vi.useFakeTimers();
@@ -52,12 +48,12 @@ describe('event timing', () => {
     });
   });
 
-  describe('batch defers local events and bus notifications', () => {
-    it('fires events on both atoms after batch completes', async () => {
+  describe('batch defers local events', () => {
+    it('fires events on both atoms after batch completes when sync is enabled', async () => {
       const key = 'batch-bus-key';
       const driver = memoryDriver();
-      const atom1 = atom<string>(key, withDriver(driver));
-      const atom2 = atom<string>(key, withDriver(driver));
+      const atom1 = atom<string>(key, withDriver(driver), withMiddleware(sync()));
+      const atom2 = atom<string>(key, withDriver(driver), withMiddleware(sync()));
 
       const atom1Events: string[] = [];
       const atom2Events: string[] = [];

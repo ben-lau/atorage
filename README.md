@@ -19,7 +19,7 @@ Type-safe, middleware-composable storage layer for `localStorage`, `sessionStora
 - **Runtime degradation** — Define a driver chain; if one fails, the next is tried automatically
 - **Middleware pipeline** — Onion model with TTL, validation, encryption, compression, caching, debounce, locking, and more
 - **Scope management** — Group atoms by scope for batch cleanup (like `AbortController` for storage)
-- **Cross-tab sync** — Broadcast changes via `BroadcastChannel` with `tabSync` middleware
+- **Opt-in sync** — `sync()` for same-tab peers, `tabSync()` across tabs; atoms are independent by default
 - **Type-safe** — Full TypeScript inference, strict mode
 - **Framework-agnostic** — Zero runtime dependencies, pure ESM, tree-shakeable
 
@@ -63,6 +63,7 @@ await token.del();
   - [encrypt — Encryption](#encrypt--encryption)
   - [lock — Single-Tab Async Lock](#lock--single-tab-async-lock)
   - [crossTabLock — Cross-Tab Lock](#crosstablock--cross-tab-lock)
+  - [sync — Same-Tab Sync](#sync--same-tab-sync)
   - [tabSync — Cross-Tab Sync](#tabsync--cross-tab-sync)
   - [logger — Logging](#logger--logging)
   - [Middleware Ordering Guide](#middleware-ordering-guide)
@@ -269,6 +270,7 @@ import {
   debounce,
   lock,
   logger,
+  sync,
   tabSync,
   compress,
   encrypt,
@@ -442,6 +444,22 @@ const shared = atom('shared', withDriver(d), withMiddleware(crossTabLock()));
 // Cross-tab mutual exclusion via Web Locks API (set/del operations only)
 ```
 
+### sync — Same-Tab Sync
+
+Atoms are pure storage handles and **do not** auto-sync other instances with the same key. Opt in explicitly:
+
+```typescript
+import { sync } from 'atorage/middleware';
+
+const a = atom('token', withDriver(d), withMiddleware(sync()));
+const b = atom('token', withDriver(d), withMiddleware(sync()));
+await a.set('x'); // b receives change via refresh
+```
+
+- Matches by **key** only (does not compare drivers/backends)
+- Each peer refreshes against its own drivers — keep backend config aligned at the call site
+- `refresh`: like `get` (read-through, emit events; may writeback/delete via middleware flags). Not a user `set`/`del`. `sync`/`tabSync` only broadcast after non-writeback `set`/`del` (writeback sets carry `isWriteback`)
+
 ### tabSync — Cross-Tab Sync
 
 ```typescript
@@ -449,6 +467,7 @@ const settings = atom('settings', withDriver(d), withMiddleware(tabSync()));
 // set()/del() broadcasts to other tabs via BroadcastChannel
 ```
 
+- Parallel to `sync`: signal only; peers land via `refresh()`
 - Broadcasts only key and operation type, **never the value** — receivers re-read from driver
 - Ordering relative to encrypt is irrelevant — no plaintext leak risk
 - Custom channel name: `tabSync('my-channel')`
@@ -472,18 +491,22 @@ const item2 = atom(
 Middleware ordering is the user's responsibility. Recommended order:
 
 ```
-validate → ttl → versioned → cached → compress → encrypt → logger
+validate → ttl → versioned → compress → encrypt → cached → sync / tabSync → logger
 ```
 
-**Common pitfall:** `cached()` must come after `ttl()`, otherwise cache hits bypass TTL expiry checks:
+`cached()` stores the value **as seen at its layer**. On `set` it snapshots before inner middleware runs (so app-level plaintext is cached even if `encrypt`/`compress` sit inside). On `get`/`refresh` miss it stores the value after inner middleware returns.
+
+**Common pitfalls:**
 
 ```typescript
-// ✗ Wrong: cache hit returns directly, ttl cannot check expiry
+// ✗ Wrong: cache hit returns before ttl's after-hook — expiry never checked
 withMiddleware(cached(), ttl(1000));
 
-// ✓ Correct: ttl checks expiry first, then cache
+// ✓ Correct: ttl wraps cached so expiry still runs on cache hits
 withMiddleware(ttl(1000), cached());
 ```
+
+Prefer listing `compress` / `encrypt` **before** `cached` (outer wrappers). That way decrypt/decompress still run when a peer `refresh` refills the cache with driver bytes. `cached` before `encrypt` is safe for local `get` after `set` (plaintext snapshot), but a raw refill path is easier to reason about with transforms outside.
 
 ### Custom Middleware
 
@@ -508,36 +531,32 @@ function myStatefulMiddleware(): MiddlewareWithHooks {
       // middleware logic
       await next();
     },
-    onInit(context) {
-      // Called during atom initialization, context contains { key, atomId }
-    },
-    onExternalChange() {
-      // Called when other atoms (in-tab) or cross-tab modify the same key
-      cache = undefined;
+    onInit(init) {
+      // { key, atomId, refresh } — stable refresh for pools/subscriptions
     },
     onDispose() {
-      // Called when atom is disposed
       cache = undefined;
     },
   };
 }
 ```
 
-**MiddlewareContext** capabilities:
+**MiddlewareContext** (per-operation):
 
-| Property/Method      | Description                                                                       |
-| -------------------- | --------------------------------------------------------------------------------- |
-| `key`                | The atom's storage key                                                            |
-| `operation`          | `'get'` / `'set'` / `'del'` / `'has'`                                             |
-| `value`              | Current value, readable and writable                                              |
-| `meta`               | Metadata object, middleware can read/write synchronously. Core auto wraps/unwraps |
-| `requestWriteback()` | Request writeback during get (e.g., after version migration)                      |
-| `requestDelete()`    | Request deletion during get (e.g., TTL expiry cleanup)                            |
-| `reportError(error)` | Report non-fatal error (dispatches atom's `error` event)                          |
+| Property/Method      | Description                                                                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key` / `atomId`     | Storage key and instance id                                                                                                                                          |
+| `operation`          | `'get'` / `'set'` / `'del'` / `'has'` / `'refresh'` (`refresh` is not a public Atom API; coordinators start it via `onInit.refresh`, or `ctx.refresh()` in a handle) |
+| `value` / `meta`     | Current value and metadata (`meta` reserved: `exp`, `ver`, `enc`, `cmp`)                                                                                             |
+| `refresh()`          | Start a refresh pipeline (same handle as `onInit.refresh`; prefer `onInit` for long-lived peers)                                                                     |
+| `requestWriteback()` | After get/refresh: request a writeback `set` with `isWriteback` (transforms run; sync/tabSync skip)                                                                  |
+| `requestDelete()`    | After get/refresh/has: request silent driver delete (not the `del` pipeline)                                                                                         |
+| `isWriteback`        | Set only: automatic writeback (e.g. migration) — coordinators must not rebroadcast                                                                                   |
+| `reportError(error)` | Report non-fatal error (flushed as atom `error` events)                                                                                                              |
 
 ## Scopes
 
-A Scope is a signal broadcaster that does two things: **contributes a key prefix** and **broadcasts clear signals**.
+A Scope is a registry that does two things: **contributes a key prefix** and **deletes registered atoms on `clear()`**.
 
 ```typescript
 import { createScope, withScope, atom, withDriver } from 'atorage';
@@ -593,7 +612,7 @@ await batch(async () => {
 ## Utilities
 
 ```typescript
-import { snapshot, restore, clearByPrefix } from 'atorage';
+import { snapshot, restore, clearByPrefix } from 'atorage/utils';
 ```
 
 ### snapshot
@@ -692,13 +711,13 @@ token.addEventListener('change', handler, { signal: ac.signal });
 ac.abort(); // removes listener
 ```
 
-| Event    | Trigger                                                                  | detail                      |
-| -------- | ------------------------------------------------------------------------ | --------------------------- |
-| `change` | Value set, or same key modified by another instance (in-tab / cross-tab) | `{ value: T \| undefined }` |
-| `delete` | Value deleted, or scope clear triggers deletion                          | —                           |
-| `error`  | Middleware or driver threw an exception                                  | `{ error: Error }`          |
+| Event    | Trigger                                                               | detail                      |
+| -------- | --------------------------------------------------------------------- | --------------------------- |
+| `change` | Local `set`, or `refresh` (e.g. via `sync` / `tabSync`) reads a value | `{ value: T \| undefined }` |
+| `delete` | Local `del`, or `refresh` finds no value, or scope `clear`            | —                           |
+| `error`  | Middleware or driver threw / reported an error                        | `{ error: Error }`          |
 
-**In-tab auto-sync:** The core includes a built-in event bus. Multiple atom instances sharing the same key within a tab automatically receive `change` events when any one calls `set()`. No `tabSync()` middleware needed for same-tab sync.
+**No implicit same-tab sync:** Atoms do not know about other instances. Use `sync()` / `tabSync()` explicitly; they trigger the events above via peer `refresh()`.
 
 ## Lifecycle
 
@@ -713,7 +732,7 @@ await token.get(); // throws AtomDisposedError
 
 - Subsequent `get()` / `set()` / `del()` / `has()` / `update()` throw `AtomDisposedError`
 - Currently executing async operations complete normally; queued operations are rejected
-- Automatically unregisters from event bus, removes scope listeners, calls middleware `onDispose()`
+- Removes scope registration and calls middleware `onDispose()`
 - **Does not release the driver** — drivers may be shared across atoms; their lifecycle is user-managed
 
 ## Architecture
@@ -726,7 +745,7 @@ await token.get(); // throws AtomDisposedError
 ├─────────────────────────────────────────────────┤
 │  Scope Management                               │  createScope(), key prefixing
 ├─────────────────────────────────────────────────┤
-│  Coordination                                   │  EventBus, lock, tabSync
+│  Coordination (opt-in middleware pools)          │  sync, tabSync, lock
 ├─────────────────────────────────────────────────┤
 │  Driver (Persistence)                           │  localStorage, indexedDB, memory
 └─────────────────────────────────────────────────┘
@@ -746,13 +765,14 @@ Value and meta are merged into a single structure, stored with a single I/O oper
 
 ## Export Structure
 
-| Import Path          | Contents                                                                                                                                              |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `atorage`            | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `AtomDisposedError`, `StorageError`, `snapshot`, `restore`, `clearByPrefix` |
-| `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                                                                       |
-| `atorage/middleware` | All preset middleware (including `validate`, `ValidationError`, `ttl`, `encrypt`, …)                                                                  |
-| `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                                                        |
-| `atorage/test`       | `testDriver` — driver conformance testing                                                                                                             |
+| Import Path          | Contents                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `atorage`            | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `AtomDisposedError`, `StorageError` |
+| `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                               |
+| `atorage/middleware` | All preset middleware (including `sync`, `tabSync`, `cached`, `validate`, `ttl`, `encrypt`, …)                |
+| `atorage/utils`      | `snapshot`, `restore`, `clearByPrefix`                                                                        |
+| `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                |
+| `atorage/test`       | `testDriver` — driver conformance testing                                                                     |
 
 ## Design Decisions & Trade-offs
 

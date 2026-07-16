@@ -2,15 +2,10 @@ import { atom } from '../../src/atom';
 import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
 import { validate, ValidationError } from '../../src/middleware/validate';
-import { eventBus } from '../../src/core/event-bus';
 
 const isString = (value: unknown): value is string => typeof value === 'string';
 
 describe('validate middleware', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   it('set with valid value succeeds', async () => {
     const driver = memoryDriver();
     const a = atom<string>('key', withDriver(driver), withMiddleware(validate(isString)));

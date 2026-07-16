@@ -10,6 +10,7 @@ export type { CachedMiddleware } from './cached';
 export { debounce } from './debounce';
 export type { DebounceMiddleware } from './debounce';
 export { lock } from './lock';
+export { sync } from './sync';
 export { tabSync } from './tab-sync';
 export { crossTabLock } from './cross-tab-lock';
 export type { CrossTabLockOptions } from './cross-tab-lock';

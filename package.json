@@ -37,6 +37,16 @@
         "default": "./dist/middleware/index.cjs"
       }
     },
+    "./utils": {
+      "import": {
+        "types": "./dist/utils/index.d.ts",
+        "default": "./dist/utils/index.mjs"
+      },
+      "require": {
+        "types": "./dist/utils/index.d.cts",
+        "default": "./dist/utils/index.cjs"
+      }
+    },
     "./debug": {
       "import": {
         "types": "./dist/debug/index.d.ts",

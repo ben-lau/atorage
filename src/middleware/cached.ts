@@ -20,11 +20,22 @@ export function cached(): CachedMiddleware {
       return;
     }
 
+    // On set: remember the value as seen at this layer (before inner
+    // encrypt/compress), but only commit to cache after next() succeeds.
+    // Caching post-next would store ciphertext when transforms are inside.
+    if (ctx.operation === 'set') {
+      const snapshot: CacheEntry = {
+        value: ctx.value,
+        meta: { ...ctx.meta },
+      };
+      await next();
+      caches.set(ctx.key, snapshot);
+      return;
+    }
+
     await next();
 
-    if (ctx.operation === 'get') {
-      caches.set(ctx.key, { value: ctx.value, meta: { ...ctx.meta } });
-    } else if (ctx.operation === 'set') {
+    if (ctx.operation === 'get' || ctx.operation === 'refresh') {
       caches.set(ctx.key, { value: ctx.value, meta: { ...ctx.meta } });
     } else if (ctx.operation === 'del') {
       caches.delete(ctx.key);
@@ -35,9 +46,6 @@ export function cached(): CachedMiddleware {
     handle,
     clear() {
       caches.clear();
-    },
-    onExternalChange(key: string) {
-      caches.delete(key);
     },
     onDispose() {
       caches.clear();

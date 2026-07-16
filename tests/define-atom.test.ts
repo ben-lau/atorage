@@ -3,14 +3,9 @@ import { withDriver, withScope, withMiddleware, withPreMiddleware } from '../src
 import { createScope } from '../src/scope';
 import { memoryDriver } from '../src/drivers/memory';
 import { debounce } from '../src/middleware/debounce';
-import { eventBus } from '../src/core/event-bus';
 import type { MiddlewareFunction } from '../src/types';
 
 describe('defineAtom', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   it('defineAtom creates atom factory with base modifiers', () => {
     const driver = memoryDriver();
     const scope = createScope('app');

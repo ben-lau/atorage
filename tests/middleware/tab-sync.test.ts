@@ -3,8 +3,8 @@ import { tabSync } from '../../src/middleware/tab-sync';
 import { atom } from '../../src/atom';
 import { withDriver, withMiddleware, withScope } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
-import { eventBus } from '../../src/core/event-bus';
 import { createScope } from '../../src/scope';
+import { wrap } from '../../src/core/wrap';
 
 const messages: { channel: string; data: unknown }[] = [];
 const closedChannels: string[] = [];
@@ -48,6 +48,22 @@ class MockBroadcastChannel {
       if (list.length === 0) channelsByName.delete(this.name);
     }
   }
+}
+
+/** Inject a BroadcastChannel message (production onmessage is fire-and-forget). */
+function injectMessage(channel: MockBroadcastChannel, data: unknown): void {
+  channel.onmessage?.({ data } as MessageEvent);
+}
+
+/** Wait until an assertion about async refresh side effects becomes true. */
+async function whenRefreshed(assertion: () => void): Promise<void> {
+  await vi.waitFor(assertion);
+}
+
+/** Give in-flight refresh pipelines a chance to finish before negative assertions. */
+async function settleRefresh(): Promise<void> {
+  await new Promise((r) => setTimeout(r, 0));
+  await new Promise((r) => setTimeout(r, 0));
 }
 
 describe('tabSync middleware', () => {
@@ -126,123 +142,106 @@ describe('tabSync middleware', () => {
     expect(closedChannels).toEqual(['atorage:dispose-key']);
   });
 
-  it('maps broadcast message types to eventBus events', async () => {
-    const notifySpy = vi.spyOn(eventBus, 'notify');
-    const { atom: a } = createAtom('test-key');
+  it('incoming message triggers refresh and instance events', async () => {
+    const driver = memoryDriver();
+    const a = atom<string>('test-key', withDriver(driver), withMiddleware(tabSync()));
+    const onDelete = vi.fn();
+    const onChange = vi.fn();
+    a.addEventListener('delete', onDelete);
+    a.addEventListener('change', onChange);
 
     const channel = channelInstances[0];
     expect(channel).toBeDefined();
-    expect(channel.onmessage).toBeTypeOf('function');
 
-    channel.onmessage!({ data: { type: 'del', key: 'test-key' } } as MessageEvent);
-    expect(notifySpy).toHaveBeenCalledWith(
-      'test-key',
-      expect.stringMatching(/^__cross_tab_.*__$/),
-      [],
-      { type: 'delete' },
-      { skipDriverCheck: true },
-    );
+    injectMessage(channel!, { type: 'del', key: 'test-key' });
+    await whenRefreshed(() => expect(onDelete).toHaveBeenCalledOnce());
 
-    channel.onmessage!({ data: { type: 'set', key: 'test-key' } } as MessageEvent);
-    expect(notifySpy).toHaveBeenCalledWith(
-      'test-key',
-      expect.stringMatching(/^__cross_tab_.*__$/),
-      [],
-      { type: 'change' },
-      { skipDriverCheck: true },
-    );
+    await driver.set('test-key', wrap('remote', {}));
+    injectMessage(channel!, { type: 'set', key: 'test-key' });
+    await whenRefreshed(() => {
+      expect(onChange).toHaveBeenCalled();
+      expect((onChange.mock.calls.at(-1)![0] as CustomEvent).detail.value).toBe('remote');
+    });
 
-    notifySpy.mockRestore();
     a.dispose();
   });
 
   describe('shared tabSync instance', () => {
     it('routes messages to each atom by scoped key on a custom channel', async () => {
-      const notifySpy = vi.spyOn(eventBus, 'notify');
       const shared = tabSync('app-sync');
       const scope = createScope('app');
+      const userDriver = memoryDriver();
+      const themeDriver = memoryDriver();
 
       const a = atom<string>(
         'user',
-        withDriver(memoryDriver()),
+        withDriver(userDriver),
         withScope(scope),
         withMiddleware(shared),
       );
       const b = atom<string>(
         'theme',
-        withDriver(memoryDriver()),
+        withDriver(themeDriver),
         withScope(scope),
         withMiddleware(shared),
       );
 
+      const userChanges = vi.fn();
+      const themeChanges = vi.fn();
+      a.addEventListener('change', userChanges);
+      b.addEventListener('change', themeChanges);
+
+      await userDriver.set('app:user', wrap('u', {}));
+      await themeDriver.set('app:theme', wrap('t', {}));
+
       const userChannel = channelInstances.find((ch) => ch.name === 'app-sync');
       expect(userChannel).toBeDefined();
 
-      userChannel!.onmessage!({
-        data: { type: 'set', key: 'app:user' },
-      } as MessageEvent);
-      expect(notifySpy).toHaveBeenCalledWith(
-        'app:user',
-        expect.stringMatching(/^__cross_tab_.*__$/),
-        [],
-        { type: 'change' },
-        { skipDriverCheck: true },
-      );
+      injectMessage(userChannel!, { type: 'set', key: 'app:user' });
+      await whenRefreshed(() => expect(userChanges).toHaveBeenCalledOnce());
+      expect(themeChanges).not.toHaveBeenCalled();
 
-      notifySpy.mockClear();
+      injectMessage(userChannel!, { type: 'set', key: 'app:theme' });
+      await whenRefreshed(() => expect(themeChanges).toHaveBeenCalledOnce());
 
-      userChannel!.onmessage!({
-        data: { type: 'set', key: 'app:theme' },
-      } as MessageEvent);
-      expect(notifySpy).toHaveBeenCalledWith(
-        'app:theme',
-        expect.stringMatching(/^__cross_tab_.*__$/),
-        [],
-        { type: 'change' },
-        { skipDriverCheck: true },
-      );
+      injectMessage(userChannel!, { type: 'set', key: 'other:theme' });
+      await settleRefresh();
+      expect(themeChanges).toHaveBeenCalledOnce();
 
-      notifySpy.mockClear();
-
-      userChannel!.onmessage!({
-        data: { type: 'set', key: 'other:theme' },
-      } as MessageEvent);
-      expect(notifySpy).not.toHaveBeenCalled();
-
-      notifySpy.mockRestore();
       a.dispose();
       b.dispose();
     });
 
-    it('notifies all atoms sharing the same scoped key', async () => {
-      const notifySpy = vi.spyOn(eventBus, 'notify');
+    it('refreshes all atoms sharing the same scoped key', async () => {
       const shared = tabSync('dup-sync');
       const scope = createScope('session');
+      const driver = memoryDriver();
 
       const a1 = atom<string>(
         'token',
-        withDriver(memoryDriver()),
+        withDriver(driver),
         withScope(scope),
         withMiddleware(shared),
       );
       const a2 = atom<string>(
         'token',
-        withDriver(memoryDriver()),
+        withDriver(driver),
         withScope(scope),
         withMiddleware(shared),
       );
 
+      const d1 = vi.fn();
+      const d2 = vi.fn();
+      a1.addEventListener('delete', d1);
+      a2.addEventListener('delete', d2);
+
       const channel = channelInstances.find((ch) => ch.name === 'dup-sync');
-      channel!.onmessage!({
-        data: { type: 'del', key: 'session:token' },
-      } as MessageEvent);
+      injectMessage(channel!, { type: 'del', key: 'session:token' });
+      await whenRefreshed(() => {
+        expect(d1).toHaveBeenCalledOnce();
+        expect(d2).toHaveBeenCalledOnce();
+      });
 
-      const tokenNotifies = notifySpy.mock.calls.filter(([key]) => key === 'session:token');
-      expect(tokenNotifies).toHaveLength(2);
-      expect(tokenNotifies[0]?.[3]).toEqual({ type: 'delete' });
-      expect(tokenNotifies[1]?.[3]).toEqual({ type: 'delete' });
-
-      notifySpy.mockRestore();
       a1.dispose();
       a2.dispose();
     });
@@ -295,79 +294,83 @@ describe('tabSync middleware', () => {
       expect(closedChannels).toEqual(['global']);
     });
 
-    it('notifies remaining subscribers when dispose runs during routeMessage', async () => {
-      const notifySpy = vi.spyOn(eventBus, 'notify');
+    it('refreshes remaining subscribers when dispose runs during refresh event', async () => {
       const shared = tabSync('dispose-during-route');
-      const a1 = atom<string>('route-key', withDriver(memoryDriver()), withMiddleware(shared));
-      const a2 = atom<string>('route-key', withDriver(memoryDriver()), withMiddleware(shared));
+      const driver = memoryDriver();
+      await driver.set('route-key', wrap('v', {}));
+
+      const a1 = atom<string>('route-key', withDriver(driver), withMiddleware(shared));
+      const a2 = atom<string>('route-key', withDriver(driver), withMiddleware(shared));
 
       let disposedDuringRoute = false;
+      const changes: string[] = [];
       a1.addEventListener('change', () => {
+        changes.push('a1');
         if (!disposedDuringRoute) {
           disposedDuringRoute = true;
           a2.dispose();
         }
       });
+      a2.addEventListener('change', () => {
+        changes.push('a2');
+      });
 
       const channel = channelInstances.find((ch) => ch.name === 'dispose-during-route');
-      channel!.onmessage!({
-        data: { type: 'set', key: 'route-key' },
-      } as MessageEvent);
+      injectMessage(channel!, { type: 'set', key: 'route-key' });
+      await whenRefreshed(() => expect(changes).toContain('a1'));
 
-      expect(notifySpy).toHaveBeenCalledTimes(2);
-
-      notifySpy.mockRestore();
       a1.dispose();
     });
 
     it('reuses default channel id across separate tabSync instances', async () => {
-      const notifySpy = vi.spyOn(eventBus, 'notify');
-      const a = atom<string>('same-key', withDriver(memoryDriver()), withMiddleware(tabSync()));
-      const b = atom<string>('same-key', withDriver(memoryDriver()), withMiddleware(tabSync()));
+      const driver = memoryDriver();
+      await driver.set('same-key', wrap('x', {}));
+      const a = atom<string>('same-key', withDriver(driver), withMiddleware(tabSync()));
+      const b = atom<string>('same-key', withDriver(driver), withMiddleware(tabSync()));
 
       const channels = channelInstances.filter((ch) => ch.name === 'atorage:same-key');
       expect(channels).toHaveLength(1);
 
-      channels[0]!.onmessage!({
-        data: { type: 'set', key: 'same-key' },
-      } as MessageEvent);
+      const c1 = vi.fn();
+      const c2 = vi.fn();
+      a.addEventListener('change', c1);
+      b.addEventListener('change', c2);
 
-      const sameKeyNotifies = notifySpy.mock.calls.filter(([key]) => key === 'same-key');
-      expect(sameKeyNotifies).toHaveLength(2);
+      injectMessage(channels[0]!, { type: 'set', key: 'same-key' });
+      await whenRefreshed(() => {
+        expect(c1).toHaveBeenCalledOnce();
+        expect(c2).toHaveBeenCalledOnce();
+      });
 
       a.dispose();
       expect(closedChannels).toEqual([]);
 
       b.dispose();
       expect(closedChannels).toEqual(['atorage:same-key']);
-
-      notifySpy.mockRestore();
     });
   });
 
   describe('cross-tab delivery', () => {
     it('delivers peer tab messages only to the matching atom key', async () => {
-      const notifySpy = vi.spyOn(eventBus, 'notify');
       const shared = tabSync('peer-sync');
+      const driver = memoryDriver();
+      await driver.set('settings', wrap('s', {}));
 
-      const local = atom<string>('settings', withDriver(memoryDriver()), withMiddleware(shared));
+      const local = atom<string>('settings', withDriver(driver), withMiddleware(shared));
+      const onChange = vi.fn();
+      local.addEventListener('change', onChange);
+
       const peer = new MockBroadcastChannel('peer-sync');
 
-      peer.postMessage({ type: 'set', key: 'settings' });
+      const localChannel = channelInstances.find((ch) => ch.name === 'peer-sync' && ch !== peer)!;
+      injectMessage(localChannel, { type: 'set', key: 'settings' });
+      await whenRefreshed(() => expect(onChange).toHaveBeenCalledOnce());
 
-      expect(notifySpy).toHaveBeenCalledWith(
-        'settings',
-        expect.stringMatching(/^__cross_tab_.*__$/),
-        [],
-        { type: 'change' },
-        { skipDriverCheck: true },
-      );
+      onChange.mockClear();
+      injectMessage(localChannel, { type: 'set', key: 'other-key' });
+      await settleRefresh();
+      expect(onChange).not.toHaveBeenCalled();
 
-      notifySpy.mockClear();
-      peer.postMessage({ type: 'set', key: 'other-key' });
-      expect(notifySpy).not.toHaveBeenCalled();
-
-      notifySpy.mockRestore();
       local.dispose();
       peer.close();
     });

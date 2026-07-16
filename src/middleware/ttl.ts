@@ -14,7 +14,7 @@ export function ttl(duration: number, options?: TtlOptions): MiddlewareFunction 
 
     await next();
 
-    if (ctx.operation === 'get' || ctx.operation === 'has') {
+    if (ctx.operation === 'get' || ctx.operation === 'has' || ctx.operation === 'refresh') {
       const exp = ctx.meta.exp;
       if (typeof exp === 'number' && exp <= Date.now()) {
         ctx.value = undefined;

@@ -2,7 +2,6 @@ import { atom } from '../../src/atom';
 import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
 import { validate, ValidationError } from '../../src/middleware/validate';
-import { eventBus } from '../../src/core/event-bus';
 import type { Driver } from '../../src/types';
 
 const isString = (value: unknown): value is string => typeof value === 'string';
@@ -16,10 +15,6 @@ function failingGetDriver(): Driver {
 }
 
 describe('error events', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   it('validate read failure dispatches error event and returns undefined', async () => {
     const driver = memoryDriver();
     const a = atom<string>(

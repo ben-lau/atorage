@@ -3,7 +3,6 @@ import { withDriver, withScope, withMiddleware } from '../src/modifiers';
 import { createScope } from '../src/scope';
 import { memoryDriver } from '../src/drivers/memory';
 import { AtomDisposedError } from '../src/errors';
-import { eventBus } from '../src/core/event-bus';
 import type { MiddlewareFunction, MiddlewareWithHooks, Driver } from '../src/types';
 
 function failingSetDriver(): Driver {
@@ -19,10 +18,6 @@ function failingSetDriver(): Driver {
 }
 
 describe('atom', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   describe('basic CRUD', () => {
     it('set then get returns value', async () => {
       const driver = memoryDriver();
@@ -203,24 +198,20 @@ describe('atom', () => {
       a.dispose();
     });
 
-    it('MiddlewareWithHooks: onExternalChange is called on event bus notification', async () => {
-      const onExternalChange = vi.fn();
+    it('MiddlewareWithHooks: onInit receives refresh capability', async () => {
+      const onInit = vi.fn();
       const mw: MiddlewareWithHooks = {
         handle: async (_ctx, next) => {
           await next();
         },
-        onExternalChange,
+        onInit,
       };
-      const driver = memoryDriver();
-      const source = atom('shared', withDriver(driver), withMiddleware(mw));
-      const listener = atom('shared', withDriver(driver), withMiddleware(mw));
+      const a = atom('shared', withDriver(memoryDriver()), withMiddleware(mw));
 
-      await source.set('updated');
+      expect(onInit).toHaveBeenCalledOnce();
+      expect(typeof onInit.mock.calls[0]![0].refresh).toBe('function');
 
-      expect(onExternalChange).toHaveBeenCalledOnce();
-
-      source.dispose();
-      listener.dispose();
+      a.dispose();
     });
 
     it('MiddlewareWithHooks: onDispose is called on atom.dispose()', async () => {
@@ -303,8 +294,8 @@ describe('atom', () => {
     });
   });
 
-  describe('event bus (same-key multi-instance)', () => {
-    it('two atoms with same key+driver: setting one triggers change on the other', async () => {
+  describe('same-key multi-instance (no implicit sync)', () => {
+    it('two atoms with same key+driver do not sync without sync middleware', async () => {
       const driver = memoryDriver();
       const a1 = atom<string>('shared', withDriver(driver));
       const a2 = atom<string>('shared', withDriver(driver));
@@ -316,13 +307,14 @@ describe('atom', () => {
 
       await a1.set('synced');
 
-      expect(changes2).toEqual(['synced']);
+      expect(changes2).toEqual([]);
+      expect(await a2.get()).toBe('synced');
 
       a1.dispose();
       a2.dispose();
     });
 
-    it('the source atom does NOT get an extra change from the bus (only its own)', async () => {
+    it('the source atom only gets its own change event', async () => {
       const driver = memoryDriver();
       const a1 = atom<string>('shared', withDriver(driver));
       const a2 = atom<string>('shared', withDriver(driver));

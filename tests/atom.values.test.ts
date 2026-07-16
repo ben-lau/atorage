@@ -1,13 +1,8 @@
-import { atom } from '../../src/atom';
-import { withDriver } from '../../src/modifiers';
-import { memoryDriver } from '../../src/drivers/memory';
-import { eventBus } from '../../src/core/event-bus';
+import { atom } from '../src/atom';
+import { withDriver } from '../src/modifiers';
+import { memoryDriver } from '../src/drivers/memory';
 
 describe('data integrity edge cases', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   describe('primitive type roundtrip', () => {
     it('string roundtrip', async () => {
       const a = atom<string>('k', withDriver(memoryDriver()));

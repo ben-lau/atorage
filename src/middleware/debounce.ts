@@ -74,7 +74,7 @@ export function debounce(ms: number): DebounceMiddleware {
       return;
     }
 
-    if (ctx.operation === 'del') {
+    if (ctx.operation === 'del' || ctx.operation === 'refresh') {
       clearPending();
     }
 
@@ -84,9 +84,6 @@ export function debounce(ms: number): DebounceMiddleware {
   return {
     handle,
     flush: doFlush,
-    onExternalChange(_key: string) {
-      clearPending();
-    },
     onDispose() {
       disposed = true;
       clearPending();

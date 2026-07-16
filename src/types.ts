@@ -29,20 +29,70 @@ export interface Driver {
 // ── Middleware ───────────────────────────────────────
 
 export interface MiddlewareContext<T = unknown> {
+  /** Storage key (after scope prefixes). */
   key: string;
-  operation: 'get' | 'set' | 'del' | 'has';
+  /** Stable id for this atom instance (not the storage key). */
+  atomId: string;
+  /**
+   * Pipeline kind.
+   *
+   * `'refresh'` is not a public Atom method. Coordinators start it via
+   * `onInit.refresh` (preferred for pools/subscriptions) or `ctx.refresh()`.
+   *
+   * Like `get`: read-through, run read-side middleware, emit instance events,
+   * and may honor `requestWriteback` / `requestDelete`. Unlike a user `set`/`del`,
+   * the refresh itself must not be treated as a local write to rebroadcast.
+   */
+  operation: 'get' | 'set' | 'del' | 'has' | 'refresh';
   value?: T;
   /**
    * Metadata stored alongside the value. Middleware may read/write arbitrary keys.
    *
    * Reserved keys (set by built-in middleware):
-   * - `exp` — expiration timestamp in ms (ttl middleware)
-   * - `ver` — data version number (versioned middleware)
+   * - `exp` — expiration timestamp in ms (ttl)
+   * - `ver` — data version number (versioned)
+   * - `enc` — encrypted payload marker (encrypt)
+   * - `cmp` — compressed payload marker (compress)
    */
   meta: Record<string, unknown>;
+  /**
+   * True when this `set` is an automatic writeback after get/refresh
+   * (e.g. migration). Only meaningful for `operation === 'set'`.
+   * Coordinators (sync/tabSync) must not treat it as a local user write.
+   */
+  isWriteback?: boolean;
+  /**
+   * Request a writeback set after the current get/refresh pipeline.
+   * Atom runs set with `isWriteback: true` (transforms still apply;
+   * sync/tabSync skip rebroadcast). Ignored for other operations.
+   */
   requestWriteback(): void;
+  /**
+   * Request deletion after the current get/refresh/has pipeline
+   * (e.g. TTL expiry). Atom uses a silent driver delete, not the `del` pipeline.
+   * Ignored for other operations.
+   */
   requestDelete(): void;
+  /**
+   * Report a non-fatal error; flushed as atom `error` events after the pipeline.
+   */
   reportError(error: Error): void;
+  /**
+   * Start a refresh pipeline on this atom (not a public Atom API).
+   * Prefer `onInit.refresh` when registering long-lived peers/subscriptions.
+   * Nested calls while a refresh is in flight are dropped.
+   */
+  refresh(): Promise<void>;
+}
+
+export interface MiddlewareInit {
+  key: string;
+  atomId: string;
+  /**
+   * Stable refresh handle for this atom instance (same as `MiddlewareContext.refresh`).
+   * Use in `onInit` for sync pools / BroadcastChannel subscriptions.
+   */
+  refresh(): Promise<void>;
 }
 
 export type MiddlewareNext = () => Promise<void>;
@@ -51,8 +101,7 @@ export type MiddlewareFunction = (ctx: MiddlewareContext, next: MiddlewareNext) 
 
 export interface MiddlewareWithHooks {
   handle: MiddlewareFunction;
-  onInit?(context: { key: string; atomId: string }): void;
-  onExternalChange?(key: string): void;
+  onInit?(init: MiddlewareInit): void;
   onDispose?(context: { key: string; atomId: string }): void;
 }
 
@@ -65,7 +114,7 @@ export interface ClearResult {
   errors: Error[];
 }
 
-export interface Scope extends EventTarget {
+export interface Scope {
   readonly name: string;
   clear(): Promise<ClearResult>;
   /** @internal */

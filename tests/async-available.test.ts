@@ -1,7 +1,6 @@
 import { atom } from '../src/atom';
 import { withDriver } from '../src/modifiers';
 import { memoryDriver } from '../src/drivers/memory';
-import { eventBus } from '../src/core/event-bus';
 import type { Driver } from '../src/types';
 
 function wrapDriver(
@@ -43,10 +42,6 @@ function trackingDriver(name: string): Driver & { sets: string[] } {
 }
 
 describe('async available()', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   it('filters driver when available() resolves to false', async () => {
     const unavailableInner = trackingDriver('unavailable');
     const unavailable = wrapDriver(unavailableInner, () => Promise.resolve(false), 'unavailable');

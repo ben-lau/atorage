@@ -1,11 +1,10 @@
 import type { ClearResult, Scope } from './types';
 
-class ScopeImpl extends EventTarget implements Scope {
+class ScopeImpl implements Scope {
   readonly name: string;
   private _cleaners: Array<() => Promise<void>> = [];
 
   constructor(name: string) {
-    super();
     this.name = name;
   }
 
@@ -18,12 +17,6 @@ class ScopeImpl extends EventTarget implements Scope {
   }
 
   async clear(): Promise<ClearResult> {
-    try {
-      this.dispatchEvent(new Event('clear'));
-    } catch {
-      /* swallow listener errors */
-    }
-
     const results = await Promise.allSettled(this._cleaners.map((fn) => fn()));
 
     const errors = results
