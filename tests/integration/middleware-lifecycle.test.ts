@@ -9,14 +9,10 @@ import { ttl } from '../../src/middleware/ttl';
 import { versioned } from '../../src/middleware/versioned';
 import { validate } from '../../src/middleware/validate';
 import { lock } from '../../src/middleware/lock';
-import { eventBus } from '../../src/core/event-bus';
+import { sync } from '../../src/middleware/sync';
 import type { MiddlewareFunction, MiddlewareWithHooks } from '../../src/types';
 
 describe('Scenario: middleware lifecycle and state management', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   describe('Practical impact of middleware ordering', () => {
     it('validate before ttl: expired data bypasses validation and returns undefined', async () => {
       vi.useFakeTimers();
@@ -210,18 +206,17 @@ describe('Scenario: middleware lifecycle and state management', () => {
     });
   });
 
-  describe('Middleware onExternalChange and cache consistency', () => {
-    it('dual instances with cached on same key: one set should invalidate the other cache', async () => {
+  describe('Middleware sync and cache consistency', () => {
+    it('dual instances with cached+sync on same key: one set refreshes the other cache', async () => {
       const driver = memoryDriver();
-      const a1 = atom<string>('shared', withDriver(driver), withMiddleware(cached()));
-      const a2 = atom<string>('shared', withDriver(driver), withMiddleware(cached()));
+      const a1 = atom<string>('shared', withDriver(driver), withMiddleware(cached(), sync()));
+      const a2 = atom<string>('shared', withDriver(driver), withMiddleware(cached(), sync()));
 
       await a1.set('first');
-      expect(await a2.get()).toBe('first'); // a2 reads from driver, warms cache
+      expect(await a2.get()).toBe('first');
 
       await a1.set('second');
 
-      // a1's set triggers eventBus -> a2's onExternalChange -> cache cleared
       const result = await a2.get();
       expect(result).toBe('second');
 
@@ -229,26 +224,21 @@ describe('Scenario: middleware lifecycle and state management', () => {
       a2.dispose();
     });
 
-    it('multiple set inside batch: eventBus notification deferred to batch end, cache may be inconsistent', async () => {
+    it('multiple set inside batch: peer refresh updates cache via sync', async () => {
       const driver = memoryDriver();
-      const a1 = atom<number>('val', withDriver(driver), withMiddleware(cached()));
-      const a2 = atom<number>('val', withDriver(driver), withMiddleware(cached()));
+      const a1 = atom<number>('val', withDriver(driver), withMiddleware(cached(), sync()));
+      const a2 = atom<number>('val', withDriver(driver), withMiddleware(cached(), sync()));
 
       await a1.set(1);
-      await a2.get(); // warm a2 cache with 1
+      await a2.get();
 
       await batch(async () => {
         await a1.set(2);
         await a1.set(3);
-        // eventBus notification is deferred within batch
-        // a2's cache hasn't been cleared yet
         const duringBatch = await a2.get();
-        // This exposes the cache inconsistency window during batch
-        // Does a2 cache return old value 1, or read new value from driver?
         expect(duringBatch).toBeDefined();
       });
 
-      // After batch ends, eventBus notification arrives, cache cleared
       const afterBatch = await a2.get();
       expect(afterBatch).toBe(3);
 

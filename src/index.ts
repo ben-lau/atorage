@@ -19,9 +19,7 @@ export type {
   MiddlewareFunction,
   MiddlewareWithHooks,
   MiddlewareContext,
+  MiddlewareInit,
   MiddlewareNext,
   Scope,
 } from './types';
-
-export { snapshot, restore, clearByPrefix } from './utils/index';
-export type { SnapshotOptions, RestoreOptions, ClearByPrefixOptions } from './utils/index';

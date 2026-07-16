@@ -16,7 +16,11 @@ export function encrypt(options: EncryptOptions): MiddlewareFunction {
 
     await next();
 
-    if (ctx.operation === 'get' && ctx.value !== undefined && ctx.meta.enc === 1) {
+    if (
+      (ctx.operation === 'get' || ctx.operation === 'refresh') &&
+      ctx.value !== undefined &&
+      ctx.meta.enc === 1
+    ) {
       try {
         const decrypted = await options.decrypt(ctx.value as string);
         ctx.value = JSON.parse(decrypted);

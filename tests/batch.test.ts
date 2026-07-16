@@ -2,13 +2,8 @@ import { atom } from '../src/atom';
 import { batch } from '../src/batch';
 import { withDriver } from '../src/modifiers';
 import { memoryDriver } from '../src/drivers/memory';
-import { eventBus } from '../src/core/event-bus';
 
 describe('batch', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   it('aggregates multiple set() on same atom into one change event', async () => {
     const a = atom('foo', withDriver(memoryDriver()));
     const events: string[] = [];

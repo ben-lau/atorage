@@ -16,7 +16,11 @@ export function compress(options: CompressOptions): MiddlewareFunction {
 
     await next();
 
-    if (ctx.operation === 'get' && ctx.value !== undefined && ctx.meta.cmp === 1) {
+    if (
+      (ctx.operation === 'get' || ctx.operation === 'refresh') &&
+      ctx.value !== undefined &&
+      ctx.meta.cmp === 1
+    ) {
       try {
         const decompressed = await options.decompress(ctx.value as string);
         ctx.value = JSON.parse(decompressed);

@@ -1,4 +1,7 @@
 import { createScope } from '../src/scope';
+import { atom } from '../src/atom';
+import { withDriver, withScope } from '../src/modifiers';
+import { memoryDriver } from '../src/drivers/memory';
 
 describe('createScope', () => {
   it('returns a Scope with the correct name', () => {
@@ -6,66 +9,39 @@ describe('createScope', () => {
     expect(scope.name).toBe('auth');
   });
 
-  it("clear() dispatches a 'clear' event", () => {
+  it('clear() deletes registered atoms', async () => {
+    const driver = memoryDriver();
     const scope = createScope('session');
-    const listener = vi.fn();
+    const a = atom<string>('token', withDriver(driver), withScope(scope));
 
-    scope.addEventListener('clear', listener);
-    scope.clear();
+    await a.set('secret');
+    const result = await scope.clear();
 
-    expect(listener).toHaveBeenCalledOnce();
-    expect(listener.mock.calls[0][0].type).toBe('clear');
+    expect(result.errors).toEqual([]);
+    await expect(a.has()).resolves.toBe(false);
+    a.dispose();
   });
 
-  it("addEventListener for 'clear' works", () => {
-    const scope = createScope('app');
-    const listener = vi.fn();
-
-    scope.addEventListener('clear', listener);
-    scope.clear();
-
-    expect(listener).toHaveBeenCalledOnce();
-  });
-
-  it('multiple listeners all receive the clear event', () => {
-    const scope = createScope('multi');
-    const first = vi.fn();
-    const second = vi.fn();
-    const third = vi.fn();
-
-    scope.addEventListener('clear', first);
-    scope.addEventListener('clear', second);
-    scope.addEventListener('clear', third);
-    scope.clear();
-
-    expect(first).toHaveBeenCalledOnce();
-    expect(second).toHaveBeenCalledOnce();
-    expect(third).toHaveBeenCalledOnce();
-  });
-
-  it('removeEventListener stops the listener from being called', () => {
-    const scope = createScope('removable');
-    const listener = vi.fn();
-
-    scope.addEventListener('clear', listener);
-    scope.removeEventListener('clear', listener);
-    scope.clear();
-
-    expect(listener).not.toHaveBeenCalled();
-  });
-
-  it('two scopes are independent', () => {
+  it('two scopes are independent', async () => {
+    const driver = memoryDriver();
     const auth = createScope('auth');
     const session = createScope('session');
-    const authListener = vi.fn();
-    const sessionListener = vi.fn();
+    const a = atom<string>('k', withDriver(driver), withScope(auth));
+    const b = atom<string>('k', withDriver(driver), withScope(session));
 
-    auth.addEventListener('clear', authListener);
-    session.addEventListener('clear', sessionListener);
+    await a.set('a');
+    await b.set('b');
+    await auth.clear();
 
-    auth.clear();
+    await expect(a.has()).resolves.toBe(false);
+    await expect(b.has()).resolves.toBe(true);
 
-    expect(authListener).toHaveBeenCalledOnce();
-    expect(sessionListener).not.toHaveBeenCalled();
+    a.dispose();
+    b.dispose();
+  });
+
+  it('is not an EventTarget', () => {
+    const scope = createScope('plain');
+    expect('addEventListener' in scope).toBe(false);
   });
 });

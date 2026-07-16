@@ -4,11 +4,13 @@ import type { MiddlewareContext, MiddlewareFunction, MiddlewareWithHooks } from 
 function createCtx(overrides?: Partial<MiddlewareContext>): MiddlewareContext {
   return {
     key: 'test',
+    atomId: 'atom_test',
     operation: 'get',
     meta: {},
     requestWriteback: () => {},
     requestDelete: () => {},
     reportError: () => {},
+    refresh: async () => {},
     ...overrides,
   };
 }

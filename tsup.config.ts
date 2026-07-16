@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     'drivers/index': 'src/drivers/index.ts',
     'middleware/index': 'src/middleware/index.ts',
+    'utils/index': 'src/utils/index.ts',
     'debug/index': 'src/debug/index.ts',
     'test/index': 'src/test/index.ts',
   },

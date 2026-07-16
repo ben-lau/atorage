@@ -6,7 +6,6 @@ import { cached } from '../../src/middleware/cached';
 import { debounce } from '../../src/middleware/debounce';
 import { lock } from '../../src/middleware/lock';
 import { ttl } from '../../src/middleware/ttl';
-import { eventBus } from '../../src/core/event-bus';
 import type { Driver, MiddlewareFunction } from '../../src/types';
 
 function slowDriver(delayMs: number): Driver {
@@ -41,10 +40,6 @@ function slowDriver(delayMs: number): Driver {
 }
 
 describe('Scenario: race conditions and concurrency', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   describe('Lockless get/set races', () => {
     it('concurrent set without protection: final value depends on which driver.set runs last', async () => {
       const driver = slowDriver(10);

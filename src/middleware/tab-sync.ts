@@ -1,9 +1,9 @@
 import type { MiddlewareFunction, MiddlewareWithHooks } from '../types';
-import { eventBus } from '../core/event-bus';
 
 interface Subscriber {
   atomKey: string;
   atomId: string;
+  refresh: () => Promise<void>;
 }
 
 interface ChannelEntry {
@@ -23,18 +23,9 @@ function routeMessage(entry: ChannelEntry, event: MessageEvent): void {
   const msgKey = event.data?.key;
   if (typeof msgKey !== 'string') return;
 
-  const type = event.data?.type === 'del' ? 'delete' : 'change';
   for (const sub of entry.subscribers.slice()) {
     if (sub.atomKey === msgKey) {
-      eventBus.notify(
-        sub.atomKey,
-        `__cross_tab_${sub.atomId}__`,
-        [],
-        { type },
-        {
-          skipDriverCheck: true,
-        },
-      );
+      void sub.refresh();
     }
   }
 }
@@ -50,9 +41,14 @@ function ensureChannelEntry(channelId: string): ChannelEntry {
   return entry;
 }
 
-function subscribe(channelId: string, atomKey: string, atomId: string): () => void {
+function subscribe(
+  channelId: string,
+  atomKey: string,
+  atomId: string,
+  refresh: () => Promise<void>,
+): () => void {
   const entry = ensureChannelEntry(channelId);
-  const subscriber: Subscriber = { atomKey, atomId };
+  const subscriber: Subscriber = { atomKey, atomId, refresh };
   entry.subscribers.push(subscriber);
 
   return () => {
@@ -75,7 +71,7 @@ export function tabSync(channel?: string): MiddlewareWithHooks {
   const handle: MiddlewareFunction = async (ctx, next) => {
     await next();
 
-    if (ctx.operation === 'set' || ctx.operation === 'del') {
+    if ((ctx.operation === 'set' || ctx.operation === 'del') && !ctx.isWriteback) {
       try {
         const channelId = resolveChannelId(channel, ctx.key);
         const entry = ensureChannelEntry(channelId);
@@ -89,10 +85,10 @@ export function tabSync(channel?: string): MiddlewareWithHooks {
   return {
     handle,
 
-    onInit({ key, atomId }) {
+    onInit({ key, atomId, refresh }) {
       try {
         const channelId = resolveChannelId(channel, key);
-        const unsubscribe = subscribe(channelId, key, atomId);
+        const unsubscribe = subscribe(channelId, key, atomId, refresh);
         subscriptions.set(atomId, unsubscribe);
       } catch {
         // BroadcastChannel may not be available

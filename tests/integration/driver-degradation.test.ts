@@ -2,7 +2,6 @@ import { atom } from '../../src/atom';
 import { withDriver } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
 import { StorageError } from '../../src/errors';
-import { eventBus } from '../../src/core/event-bus';
 import type { Driver } from '../../src/types';
 
 function createFlakyDriver(
@@ -38,10 +37,6 @@ function createFlakyDriver(
 }
 
 describe('Scenario: driver degradation under real conditions', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   describe('Automatic degradation on primary driver failure', () => {
     it('primary driver set failure → automatic fallback to backup driver', async () => {
       const primary = createFlakyDriver('primary', { set: true });

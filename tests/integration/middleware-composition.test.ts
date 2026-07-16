@@ -5,7 +5,6 @@ import { ttl } from '../../src/middleware/ttl';
 import { cached } from '../../src/middleware/cached';
 import { versioned } from '../../src/middleware/versioned';
 import { encrypt } from '../../src/middleware/encrypt';
-import { eventBus } from '../../src/core/event-bus';
 
 const simpleEncryptor = {
   encrypt: (s: string) => s.split('').reverse().join(''),
@@ -26,10 +25,6 @@ function spyDriver() {
 }
 
 describe('middleware composition', () => {
-  afterEach(() => {
-    eventBus._clear();
-  });
-
   describe('ttl + cached', () => {
     const TTL_MS = 1000;
 

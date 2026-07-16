@@ -19,7 +19,7 @@
 - **运行时降级** — 定义 driver 链，高优先级失败时自动降级到下一个
 - **中间件管线** — 洋葱模型，支持 TTL、校验、加密、压缩、缓存、防抖、锁等
 - **作用域管理** — 通过 Scope 将 atom 分组，一键清理（类似 `AbortController`）
-- **跨 Tab 同步** — 通过 `BroadcastChannel` 广播变更，`tabSync` 中间件即插即用
+- **可选同步** — `sync()` 同 tab 多实例、`tabSync()` 跨 tab；默认互不感知，按需挂载
 - **类型安全** — 完整的 TypeScript 类型推导，strict 模式
 - **极致轻量** — 核心 ~2 kB min+brotli，含全部 driver 和中间件 < 5 kB
 - **零依赖** — 没有任何运行时依赖，包括 IndexedDB driver 在内全部自实现
@@ -65,6 +65,7 @@ await token.del();
   - [encrypt — 加密](#encrypt--加密)
   - [lock — 单 Tab 异步锁](#lock--单-tab-异步锁)
   - [crossTabLock — 跨 Tab 锁](#crosstablock--跨-tab-锁)
+  - [sync — 同 Tab 同步](#sync--同-tab-同步)
   - [tabSync — 跨 Tab 同步](#tabsync--跨-tab-同步)
   - [logger — 日志](#logger--日志)
   - [中间件顺序指南](#中间件顺序指南)
@@ -271,6 +272,7 @@ import {
   debounce,
   lock,
   logger,
+  sync,
   tabSync,
   compress,
   encrypt,
@@ -444,6 +446,22 @@ const shared = atom('shared', withDriver(d), withMiddleware(crossTabLock()));
 // 通过 Web Locks API 跨 tab 互斥（仅 set/del 操作）
 ```
 
+### sync — 同 Tab 同步
+
+Atom 默认是纯存储句柄，**不会**自动同步同 key 的其他实例。需要时显式挂载：
+
+```typescript
+import { sync } from 'atorage/middleware';
+
+const a = atom('token', withDriver(d), withMiddleware(sync()));
+const b = atom('token', withDriver(d), withMiddleware(sync()));
+await a.set('x'); // b 收到 change（经 refresh 读穿 driver）
+```
+
+- 只按 **同 key** 通知 peer 走 `operation: 'refresh'`（不比较 driver/backend）
+- Peer 各自读自己的 driver；若后端不同，调用方应保证配置一致
+- `refresh`：与 `get` 同类（读穿、发事件；可经中间件标志 writeback/delete）。不是用户 `set`/`del`。`sync`/`tabSync` 只在非 writeback 的 `set`/`del` 后广播（writeback 带 `isWriteback`）
+
 ### tabSync — 跨 Tab 同步
 
 ```typescript
@@ -451,6 +469,7 @@ const settings = atom('settings', withDriver(d), withMiddleware(tabSync()));
 // set()/del() 后通过 BroadcastChannel 通知其他 tab
 ```
 
+- 与 `sync` 平行：只发信号，对端对本实例 `refresh()`
 - 仅广播 key 和操作类型，**不传 value**——接收端从 driver 重新读取
 - 因此与 encrypt 等中间件的顺序无关，不存在明文泄露风险
 - 可自定义 channel 名：`tabSync('my-channel')`
@@ -474,18 +493,22 @@ const item2 = atom(
 中间件顺序由用户负责，推荐顺序：
 
 ```
-validate → ttl → versioned → cached → compress → encrypt → logger
+validate → ttl → versioned → compress → encrypt → cached → sync / tabSync → logger
 ```
 
-**常见陷阱：** `cached()` 必须在 `ttl()` 之后，否则缓存命中时 TTL 无法检查过期：
+`cached()` 缓存的是**该层看到的值**：`set` 时在进入更内层中间件之前快照（因此即便 `encrypt`/`compress` 写在它后面，本地读到的仍是应用层明文）；`get`/`refresh` 未命中时则缓存内层返回后的值。
+
+**常见陷阱：**
 
 ```typescript
-// ✗ 错误：cache 命中直接返回，ttl 无法拦截过期数据
+// ✗ 错误：cache 命中直接返回，ttl 的 after 无法检查过期
 withMiddleware(cached(), ttl(1000));
 
-// ✓ 正确：ttl 先检查过期，再走缓存
+// ✓ 正确：ttl 包住 cached，命中缓存时仍会检查过期
 withMiddleware(ttl(1000), cached());
 ```
+
+更推荐把 `compress` / `encrypt` 写在 `cached` **前面**（外层）。这样 peer `refresh` 用 driver 字节回填缓存时，外层仍会 decrypt/decompress。`cached` 在 `encrypt` 前对「本地 set 后再 get」是安全的（明文快照），但从磁盘回填的路径用「变换包住缓存」更好推理。
 
 ### 自定义中间件
 
@@ -507,39 +530,38 @@ function myStatefulMiddleware(): MiddlewareWithHooks {
   let cache: unknown = undefined;
   return {
     handle: async (ctx, next) => {
-      // 中间件逻辑
+      // 当次 IO 上下文；长期状态用 onInit / onDispose
+      if (ctx.operation === 'refresh') {
+        cache = undefined;
+      }
       await next();
     },
-    onInit(context) {
-      // atom 初始化时调用，context 包含 { key, atomId }
-    },
-    onExternalChange() {
-      // 同 tab 其他 atom 或跨 tab 修改了同 key 时调用
-      cache = undefined;
+    onInit(init) {
+      // { key, atomId, refresh } — stable refresh for pools/subscriptions
     },
     onDispose() {
-      // atom dispose 时调用
       cache = undefined;
     },
   };
 }
 ```
 
-**MiddlewareContext** 提供的能力：
+**MiddlewareContext**（当次 IO）：
 
-| 属性/方法            | 说明                                              |
-| -------------------- | ------------------------------------------------- |
-| `key`                | atom 的存储 key                                   |
-| `operation`          | `'get'` / `'set'` / `'del'` / `'has'`             |
-| `value`              | 当前值，可读写                                    |
-| `meta`               | 元数据对象，中间件可同步读写。核心层自动包裹/解包 |
-| `requestWriteback()` | 在 get 操作中请求回写（如版本迁移后）             |
-| `requestDelete()`    | 在 get 操作中请求删除（如 TTL 过期后主动清理）    |
-| `reportError(error)` | 报告非致命错误（触发 atom 的 `error` 事件）       |
+| 属性/方法            | 说明                                                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key` / `atomId`     | 存储 key 与实例 id                                                                                                                            |
+| `operation`          | `'get'` / `'set'` / `'del'` / `'has'` / `'refresh'`（`refresh` 非公开 Atom API；协调器优先用 `onInit.refresh`，管线内也可用 `ctx.refresh()`） |
+| `value` / `meta`     | 当前值与元数据（`meta` 保留键：`exp` / `ver` / `enc` / `cmp`）                                                                                |
+| `refresh()`          | 触发本实例 refresh（与 `onInit.refresh` 同源；长期 peer 注册优先用 `onInit`）                                                                 |
+| `requestWriteback()` | get/refresh 结束后请求带 `isWriteback` 的回写 set（变换仍跑；sync/tabSync 不广播）                                                            |
+| `requestDelete()`    | get/refresh/has 结束后请求静默删盘（不走 `del` 管线）                                                                                         |
+| `isWriteback`        | 仅对 set 有意义：自动回写（如 migrate）——协调器不得再广播                                                                                     |
+| `reportError(error)` | 报告非致命错误（管线结束后刷成 atom `error` 事件）                                                                                            |
 
 ## Scope（作用域）
 
-Scope 是信号广播器，做两件事：**贡献 key 前缀** 和 **广播 clear 信号**。
+Scope 是注册表，做两件事：**贡献 key 前缀** 和 **`clear()` 时删除已登记 atom**。
 
 ```typescript
 import { createScope, withScope, atom, withDriver } from 'atorage';
@@ -595,7 +617,7 @@ await batch(async () => {
 ## 工具函数
 
 ```typescript
-import { snapshot, restore, clearByPrefix } from 'atorage';
+import { snapshot, restore, clearByPrefix } from 'atorage/utils';
 ```
 
 ### snapshot — 快照
@@ -695,13 +717,13 @@ token.addEventListener('change', handler, { signal: ac.signal });
 ac.abort(); // 移除监听
 ```
 
-| 事件     | 触发时机                                         | detail                      |
-| -------- | ------------------------------------------------ | --------------------------- |
-| `change` | 值被 set，或同 tab / 跨 tab 其他实例修改了同 key | `{ value: T \| undefined }` |
-| `delete` | 值被 del，或 scope clear 触发删除                | —                           |
-| `error`  | 中间件或 driver 抛出异常                         | `{ error: Error }`          |
+| 事件     | 触发时机                                                           | detail                      |
+| -------- | ------------------------------------------------------------------ | --------------------------- |
+| `change` | 本实例 `set` 成功，或经 `refresh`（如 `sync` / `tabSync`）读到新值 | `{ value: T \| undefined }` |
+| `delete` | 本实例 `del` 成功，或 `refresh` 发现值已不存在，或 scope clear     | —                           |
+| `error`  | 中间件或 driver 抛出异常                                           | `{ error: Error }`          |
 
-**同 Tab 自动互通：** 核心层内置事件总线，同一 tab 内多个 atom 实例共享同一 key 时，一个 `set()` 自动触发其他实例的 `change` 事件。无需 `tabSync()` 中间件。
+**无隐式同 tab 互通：** Atom 不感知其他实例。需要同步时显式使用 `sync()` / `tabSync()`，它们通过对端 `refresh()` 触发上述事件。
 
 ## 生命周期
 
@@ -716,20 +738,20 @@ await token.get(); // 抛出 AtomDisposedError
 
 - 后续 `get()` / `set()` / `del()` / `has()` / `update()` 抛出 `AtomDisposedError`
 - 当前正在执行的异步操作会等待完成，排队中的操作被 reject
-- 自动从事件总线注销、移除 scope 监听、调用中间件 `onDispose()`
+- 移除 scope 登记、调用中间件 `onDispose()`
 - **不释放 driver**——driver 可能被多个 atom 共享，生命周期由用户管理
 
 ## 架构
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Atom API                                       │  atom(), defineAtom(), batch()
+│  Atom API（纯句柄）                              │  atom(), defineAtom(), batch()
 ├─────────────────────────────────────────────────┤
-│  Middleware Pipeline（洋葱模型）                  │  validate, ttl, encrypt, ...
+│  Middleware Pipeline（洋葱模型）                  │  validate, ttl, cached, sync, ...
 ├─────────────────────────────────────────────────┤
-│  Scope Management                               │  createScope(), key 前缀拼接
+│  Scope（注册表）                                  │  createScope(), key 前缀 + clear()
 ├─────────────────────────────────────────────────┤
-│  Coordination                                   │  EventBus, lock, tabSync
+│  Coordination（可选中间件私有 pool）               │  sync, tabSync, lock
 ├─────────────────────────────────────────────────┤
 │  Driver（持久化后端）                             │  localStorage, indexedDB, memory
 └─────────────────────────────────────────────────┘
@@ -749,13 +771,14 @@ Value 和 meta 合并为一个结构体存储，单次 I/O 读写：
 
 ## 导出结构
 
-| 导入路径             | 内容                                                                                                                                                |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `atorage`            | 核心 API：`atom`、`defineAtom`、`createScope`、`batch`、modifier、类型、`AtomDisposedError`、`StorageError`、`snapshot`、`restore`、`clearByPrefix` |
-| `atorage/drivers`    | `memoryDriver`、`localStorageDriver`、`sessionStorageDriver`、`indexedDBDriver`                                                                     |
-| `atorage/middleware` | 全部预设中间件（含 `validate`、`ValidationError`、`ttl`、`encrypt` 等）                                                                             |
-| `atorage/debug`      | `raw`、`inspect` — 调试工具                                                                                                                         |
-| `atorage/test`       | `testDriver` — driver 一致性测试                                                                                                                    |
+| 导入路径             | 内容                                                                                                        |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `atorage`            | 核心 API：`atom`、`defineAtom`、`createScope`、`batch`、modifier、类型、`AtomDisposedError`、`StorageError` |
+| `atorage/drivers`    | `memoryDriver`、`localStorageDriver`、`sessionStorageDriver`、`indexedDBDriver`                             |
+| `atorage/middleware` | 全部预设中间件（含 `sync`、`tabSync`、`cached`、`validate`、`ttl`、`encrypt` 等）                           |
+| `atorage/utils`      | `snapshot`、`restore`、`clearByPrefix`                                                                      |
+| `atorage/debug`      | `raw`、`inspect` — 调试工具                                                                                 |
+| `atorage/test`       | `testDriver` — driver 一致性测试                                                                            |
 
 ## 设计决策与 Trade-offs
 
