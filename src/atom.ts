@@ -42,6 +42,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
   private _scopeCleanups: Array<() => void> = [];
   private _driversReady: Promise<void>;
   private _refreshing = false;
+  private _lastKnown: T | undefined = undefined;
 
   constructor(key: string, config: AtomConfig<T>) {
     super();
@@ -66,6 +67,11 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
     return this._run(() => this._doGet());
   }
 
+  peek(): T | undefined {
+    this._ensureAlive();
+    return this._lastKnown;
+  }
+
   async set(value: T): Promise<void> {
     this._ensureAlive();
     return this._run(() => this._doSet(value));
@@ -82,6 +88,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
         this._dispatchDelete();
       });
 
+      this._lastKnown = undefined;
       this._flushErrors(errors);
     });
   }
@@ -131,6 +138,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
+    this._lastKnown = undefined;
 
     for (const cleanup of this._scopeCleanups) {
       cleanup();
@@ -216,6 +224,8 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
 
         await this._applyReadFlags(ctx, flags);
 
+        this._lastKnown = ctx.value as T | undefined;
+
         if (ctx.value === undefined) {
           this._dispatchDelete();
         } else {
@@ -242,6 +252,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
 
     await this._applyReadFlags(ctx, flags);
 
+    this._lastKnown = ctx.value as T | undefined;
     this._flushErrors(errors);
 
     return ctx.value as T | undefined;
@@ -278,6 +289,7 @@ class AtomImpl<T> extends EventTarget implements Atom<T> {
       }
     });
 
+    this._lastKnown = value;
     this._flushErrors(errors);
   }
 

@@ -2,7 +2,6 @@ import { atom } from '../../src/atom';
 import { defineAtom } from '../../src/define-atom';
 import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
-import { cached } from '../../src/middleware/cached';
 import { sync } from '../../src/middleware/sync';
 import { versioned } from '../../src/middleware/versioned';
 import { wrap } from '../../src/core/wrap';
@@ -18,8 +17,10 @@ describe('journey: atom independence (default isolated, sync opt-in)', () => {
 
     await a.set('secret');
     expect(onB).not.toHaveBeenCalled();
+    expect(b.peek()).toBeUndefined();
     // Peer can still read via shared driver when it actively gets
     expect(await b.get()).toBe('secret');
+    expect(b.peek()).toBe('secret');
 
     a.dispose();
     b.dispose();
@@ -28,7 +29,7 @@ describe('journey: atom independence (default isolated, sync opt-in)', () => {
   it('same key + sync → peer receives change via refresh', async () => {
     const driver = memoryDriver();
     const a = atom<string>('token', withDriver(driver), withMiddleware(sync()));
-    const b = atom<string>('token', withDriver(driver), withMiddleware(cached(), sync()));
+    const b = atom<string>('token', withDriver(driver), withMiddleware(sync()));
 
     const values: Array<string | undefined> = [];
     b.addEventListener('change', (e) => {
@@ -37,21 +38,23 @@ describe('journey: atom independence (default isolated, sync opt-in)', () => {
 
     await a.set('v1');
     expect(values).toContain('v1');
+    expect(b.peek()).toBe('v1');
     expect(await b.get()).toBe('v1');
 
     a.dispose();
     b.dispose();
   });
 
-  it('cached peer is refreshed to new value (not stuck on stale cache)', async () => {
+  it('sync peer peek updates to new value (not stuck on prior observation)', async () => {
     const driver = memoryDriver();
     const a = atom<string>('prefs', withDriver(driver), withMiddleware(sync()));
-    const b = atom<string>('prefs', withDriver(driver), withMiddleware(cached(), sync()));
+    const b = atom<string>('prefs', withDriver(driver), withMiddleware(sync()));
 
     await b.set('old');
-    expect(await b.get()).toBe('old');
+    expect(b.peek()).toBe('old');
 
     await a.set('new');
+    expect(b.peek()).toBe('new');
     expect(await b.get()).toBe('new');
 
     a.dispose();
@@ -96,15 +99,17 @@ describe('journey: atom independence (default isolated, sync opt-in)', () => {
     b.dispose();
   });
 
-  it('defineAtom factory gives each atom its own cached instance', async () => {
+  it('defineAtom factory gives each atom its own peek last-known', async () => {
     const driver = memoryDriver();
-    const create = defineAtom(() => [withDriver(driver), withMiddleware(cached())]);
+    const create = defineAtom(() => [withDriver(driver)]);
 
     const a = create<string>('a');
     const b = create<string>('b');
 
     await a.set('alpha');
     await b.set('beta');
+    expect(a.peek()).toBe('alpha');
+    expect(b.peek()).toBe('beta');
     expect(await a.get()).toBe('alpha');
     expect(await b.get()).toBe('beta');
 

@@ -2,7 +2,6 @@ import { atom } from '../../src/atom';
 import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
 import { ttl } from '../../src/middleware/ttl';
-import { cached } from '../../src/middleware/cached';
 import { versioned } from '../../src/middleware/versioned';
 import { encrypt } from '../../src/middleware/encrypt';
 
@@ -25,7 +24,7 @@ function spyDriver() {
 }
 
 describe('middleware composition', () => {
-  describe('ttl + cached', () => {
+  describe('ttl + peek', () => {
     const TTL_MS = 1000;
 
     beforeEach(() => {
@@ -36,32 +35,34 @@ describe('middleware composition', () => {
       vi.useRealTimers();
     });
 
-    it('TTL check runs on cached data because meta is restored', async () => {
+    it('TTL check runs on every get; peek clears after expired get', async () => {
       vi.setSystemTime(0);
 
       const a = atom<string>(
-        'ttl-cached-key',
+        'ttl-peek-key',
         withDriver(memoryDriver()),
-        withMiddleware(ttl(TTL_MS), cached()),
+        withMiddleware(ttl(TTL_MS)),
       );
 
       await a.set('hello');
+      expect(a.peek()).toBe('hello');
       await expect(a.get()).resolves.toBe('hello');
 
       vi.advanceTimersByTime(TTL_MS);
       await expect(a.get()).resolves.toBeUndefined();
+      expect(a.peek()).toBeUndefined();
 
       a.dispose();
     });
   });
 
-  describe('versioned + cached', () => {
-    it('first get migrates, second get returns cached migrated data', async () => {
+  describe('versioned + peek', () => {
+    it('first get migrates; second get hits driver again; peek holds migrated value', async () => {
       const driver = spyDriver();
       const oldData = { count: 1 };
 
       const a = atom<{ count: number; new?: boolean }>(
-        'versioned-cached-key',
+        'versioned-peek-key',
         withDriver(driver),
         withMiddleware(
           versioned({
@@ -70,7 +71,6 @@ describe('middleware composition', () => {
               1: (d: { count: number }) => ({ ...d, new: true }),
             },
           }),
-          cached(),
         ),
       );
 
@@ -78,33 +78,37 @@ describe('middleware composition', () => {
 
       await expect(a.get()).resolves.toEqual({ count: 1, new: true });
       expect(driver.getCount()).toBe(1);
+      expect(a.peek()).toEqual({ count: 1, new: true });
 
       await expect(a.get()).resolves.toEqual({ count: 1, new: true });
-      expect(driver.getCount()).toBe(1);
+      expect(driver.getCount()).toBe(2);
 
       a.dispose();
     });
   });
 
-  describe('encrypt + cached', () => {
-    it('encrypt outer layer decrypts cached encrypted value on cache hit', async () => {
+  describe('encrypt + peek', () => {
+    it('peek stays plaintext while driver stores ciphertext; every get hits driver', async () => {
       const driver = spyDriver();
       const a = atom<string>(
-        'encrypt-cached-key',
+        'encrypt-peek-key',
         withDriver(driver),
-        withMiddleware(encrypt(simpleEncryptor), cached()),
+        withMiddleware(encrypt(simpleEncryptor)),
       );
 
       await a.set('hello');
+      expect(a.peek()).toBe('hello');
 
       const stored = (await driver.get(a.key)) as { $v: string };
       expect(stored.$v).toBe(simpleEncryptor.encrypt(JSON.stringify('hello')));
 
+      const countAfterInspect = driver.getCount();
       await expect(a.get()).resolves.toBe('hello');
-      expect(driver.getCount()).toBe(1);
+      expect(driver.getCount()).toBe(countAfterInspect + 1);
+      expect(a.peek()).toBe('hello');
 
       await expect(a.get()).resolves.toBe('hello');
-      expect(driver.getCount()).toBe(1);
+      expect(driver.getCount()).toBe(countAfterInspect + 2);
 
       a.dispose();
     });

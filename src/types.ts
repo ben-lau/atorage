@@ -134,6 +134,13 @@ export interface Atom<T> extends EventTarget {
 
   getMeta(): Promise<Record<string, unknown> | undefined>;
 
+  /**
+   * Synchronous last-known value for this atom instance.
+   * Updated after successful get/set/refresh/del. Never reads storage or runs middleware.
+   * Do not mutate the returned object.
+   */
+  peek(): T | undefined;
+
   dispose(): void;
 }
 

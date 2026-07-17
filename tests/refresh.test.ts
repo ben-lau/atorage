@@ -1,7 +1,6 @@
 import { atom } from '../src/atom';
-import { withDriver, withMiddleware } from '../src/modifiers';
+import { withDriver } from '../src/modifiers';
 import { memoryDriver } from '../src/drivers/memory';
-import { cached } from '../src/middleware/cached';
 
 function spyDriver() {
   const driver = memoryDriver();
@@ -16,58 +15,39 @@ function spyDriver() {
   };
 }
 
-describe('cached.clear() (fresh read)', () => {
-  it('clear() then get() bypasses cache and reads from driver', async () => {
+describe('get freshness (no transparent cache)', () => {
+  it('repeated get always reads from driver; peek stays in sync', async () => {
     const driver = spyDriver();
-    const myCache = cached();
-    const a = atom<string>('cache-clear-key', withDriver(driver), withMiddleware(myCache));
+    const a = atom<string>('fresh-key', withDriver(driver));
 
     await a.set('initial');
-    await expect(a.get()).resolves.toBe('initial');
+    expect(a.peek()).toBe('initial');
     expect(driver.getCount()).toBe(0);
+
+    await expect(a.get()).resolves.toBe('initial');
+    expect(driver.getCount()).toBe(1);
+    expect(a.peek()).toBe('initial');
 
     await driver.set(a.key, { $v: 'from-driver' });
-
-    await expect(a.get()).resolves.toBe('initial');
-    expect(driver.getCount()).toBe(0);
-
-    myCache.clear();
     await expect(a.get()).resolves.toBe('from-driver');
-    expect(driver.getCount()).toBe(1);
-
-    a.dispose();
-  });
-
-  it('clear() without cached middleware has no effect', async () => {
-    const driver = spyDriver();
-    const a = atom<string>('no-cache-key', withDriver(driver));
-
-    await a.set('value');
-    expect(driver.getCount()).toBe(0);
-
-    await expect(a.get()).resolves.toBe('value');
-    expect(driver.getCount()).toBe(1);
-
-    await expect(a.get()).resolves.toBe('value');
     expect(driver.getCount()).toBe(2);
+    expect(a.peek()).toBe('from-driver');
 
     a.dispose();
   });
 
-  it('get after clear() updates the cache for next read', async () => {
+  it('peek stays stale after external write until get', async () => {
     const driver = spyDriver();
-    const myCache = cached();
-    const a = atom<string>('cache-update-key', withDriver(driver), withMiddleware(myCache));
+    const a = atom<string>('stale-peek-key', withDriver(driver));
 
     await a.set('v1');
+    expect(a.peek()).toBe('v1');
+
     await driver.set(a.key, { $v: 'v2' });
-
-    myCache.clear();
-    await expect(a.get()).resolves.toBe('v2');
-    const countAfterClear = driver.getCount();
+    expect(a.peek()).toBe('v1');
 
     await expect(a.get()).resolves.toBe('v2');
-    expect(driver.getCount()).toBe(countAfterClear);
+    expect(a.peek()).toBe('v2');
 
     a.dispose();
   });

@@ -3,7 +3,6 @@ import { batch } from '../../src/batch';
 import { withDriver, withMiddleware, withScope } from '../../src/modifiers';
 import { createScope } from '../../src/scope';
 import { memoryDriver } from '../../src/drivers/memory';
-import { cached } from '../../src/middleware/cached';
 import { debounce } from '../../src/middleware/debounce';
 import { ttl } from '../../src/middleware/ttl';
 import { versioned } from '../../src/middleware/versioned';
@@ -61,32 +60,23 @@ describe('Scenario: middleware lifecycle and state management', () => {
       a.dispose();
     });
 
-    it('cached before validate: invalid data may be cached', async () => {
+    it('peek stays stale after external invalid write until get runs validate', async () => {
       const driver = memoryDriver();
       const isPositive = (v: unknown) => typeof v === 'number' && v > 0;
-      const cacheMw = cached();
 
-      const a = atom<number>(
-        'key',
-        withDriver(driver),
-        withMiddleware(cacheMw, validate(isPositive)),
-      );
+      const a = atom<number>('key', withDriver(driver), withMiddleware(validate(isPositive)));
 
-      await a.set(42); // valid, cached
-      expect(await a.get()).toBe(42); // cache hit
+      await a.set(42);
+      expect(a.peek()).toBe(42);
+      expect(await a.get()).toBe(42);
 
       // Directly modify driver with invalid value
       await driver.set('key', { $v: -1 });
+      expect(a.peek()).toBe(42);
 
-      // Cache still hits old value 42, no validate error triggered
-      expect(await a.get()).toBe(42);
-
-      // Clear cache and re-read
-      cacheMw.clear();
-      // validate runs after cached, get path: cached(miss) -> validate -> core
-      // Actual onion: cached-before -> validate-before -> core -> validate-after -> cached-after
-      // validate-after detects -1 is invalid, sets to undefined
+      // Fresh get runs validate; invalid → undefined and updates peek
       expect(await a.get()).toBeUndefined();
+      expect(a.peek()).toBeUndefined();
 
       a.dispose();
     });
@@ -206,28 +196,28 @@ describe('Scenario: middleware lifecycle and state management', () => {
     });
   });
 
-  describe('Middleware sync and cache consistency', () => {
-    it('dual instances with cached+sync on same key: one set refreshes the other cache', async () => {
+  describe('Middleware sync and peek consistency', () => {
+    it('dual instances with sync on same key: one set refreshes the other peek', async () => {
       const driver = memoryDriver();
-      const a1 = atom<string>('shared', withDriver(driver), withMiddleware(cached(), sync()));
-      const a2 = atom<string>('shared', withDriver(driver), withMiddleware(cached(), sync()));
+      const a1 = atom<string>('shared', withDriver(driver), withMiddleware(sync()));
+      const a2 = atom<string>('shared', withDriver(driver), withMiddleware(sync()));
 
       await a1.set('first');
+      expect(a2.peek()).toBe('first');
       expect(await a2.get()).toBe('first');
 
       await a1.set('second');
-
-      const result = await a2.get();
-      expect(result).toBe('second');
+      expect(a2.peek()).toBe('second');
+      expect(await a2.get()).toBe('second');
 
       a1.dispose();
       a2.dispose();
     });
 
-    it('multiple set inside batch: peer refresh updates cache via sync', async () => {
+    it('multiple set inside batch: peer refresh updates peek via sync', async () => {
       const driver = memoryDriver();
-      const a1 = atom<number>('val', withDriver(driver), withMiddleware(cached(), sync()));
-      const a2 = atom<number>('val', withDriver(driver), withMiddleware(cached(), sync()));
+      const a1 = atom<number>('val', withDriver(driver), withMiddleware(sync()));
+      const a2 = atom<number>('val', withDriver(driver), withMiddleware(sync()));
 
       await a1.set(1);
       await a2.get();
@@ -239,8 +229,8 @@ describe('Scenario: middleware lifecycle and state management', () => {
         expect(duringBatch).toBeDefined();
       });
 
-      const afterBatch = await a2.get();
-      expect(afterBatch).toBe(3);
+      expect(a2.peek()).toBe(3);
+      expect(await a2.get()).toBe(3);
 
       a1.dispose();
       a2.dispose();
@@ -381,13 +371,12 @@ describe('Scenario: middleware lifecycle and state management', () => {
   });
 
   describe('Full recommended middleware stack real-world scenario', () => {
-    it('validate + ttl + versioned + cached full stack works', async () => {
+    it('validate + ttl + versioned full stack works with peek', async () => {
       vi.useFakeTimers();
       vi.setSystemTime(0);
 
       const driver = memoryDriver();
       const isObject = (v: unknown) => typeof v === 'object' && v !== null;
-      const cacheMw = cached();
 
       const a = atom<{ name: string; v2?: boolean }>(
         'user-profile',
@@ -396,25 +385,19 @@ describe('Scenario: middleware lifecycle and state management', () => {
           validate(isObject),
           ttl(5000),
           versioned({ current: 2, migrate: { 1: (d: any) => ({ ...d, v2: true }) } }),
-          cacheMw,
         ),
       );
 
-      // Normal write
       await a.set({ name: 'alice' });
+      expect(a.peek()).toEqual({ name: 'alice' });
       expect(await a.get()).toEqual({ name: 'alice' });
 
-      // Verify cache works
-      cacheMw.clear();
-      expect(await a.get()).toEqual({ name: 'alice' });
-
-      // Verify TTL expiry
       vi.advanceTimersByTime(6000);
-      cacheMw.clear(); // Must clear cache to see TTL effect
       expect(await a.get()).toBeUndefined();
+      expect(a.peek()).toBeUndefined();
 
-      // Verify validate rejects invalid values
       await expect(a.set('not-an-object' as any)).rejects.toThrow();
+      expect(a.peek()).toBeUndefined();
 
       vi.useRealTimers();
       a.dispose();

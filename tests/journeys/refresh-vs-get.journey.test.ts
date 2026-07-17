@@ -1,7 +1,6 @@
 import { atom } from '../../src/atom';
 import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
-import { cached } from '../../src/middleware/cached';
 import { debounce } from '../../src/middleware/debounce';
 import { sync } from '../../src/middleware/sync';
 import { ttl } from '../../src/middleware/ttl';
@@ -10,7 +9,7 @@ import { wrap } from '../../src/core/wrap';
 import { waitForEvent } from './_helpers';
 
 describe('journey: refresh vs get (user-visible effects)', () => {
-  it('TTL expiry on peer refresh clears cached peer without local get', async () => {
+  it('TTL expiry on peer refresh clears peer peek without local get', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
 
@@ -23,19 +22,20 @@ describe('journey: refresh vs get (user-visible effects)', () => {
     const peer = atom<string>(
       'exp',
       withDriver(driver),
-      withMiddleware(ttl(1000, { deleteOnExpire: true }), cached(), sync()),
+      withMiddleware(ttl(1000, { deleteOnExpire: true }), sync()),
     );
 
     await writer.set('soon');
     expect(await peer.get()).toBe('soon');
+    expect(peer.peek()).toBe('soon');
 
     vi.setSystemTime(2000);
 
-    // Another writer set after expiry: deleteOnExpire on writer's get path...
     // Trigger peer refresh by deleting from writer
     const deleted = waitForEvent(peer, 'delete');
     await writer.del();
     await deleted;
+    expect(peer.peek()).toBeUndefined();
     expect(await peer.get()).toBeUndefined();
 
     writer.dispose();

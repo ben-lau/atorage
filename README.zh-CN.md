@@ -59,7 +59,6 @@ await token.del();
   - [ttl — 过期控制](#ttl--过期控制)
   - [validate — 运行时校验](#validate--运行时校验)
   - [versioned — 版本迁移](#versioned--版本迁移)
-  - [cached — 内存缓存](#cached--内存缓存)
   - [debounce — 写入防抖](#debounce--写入防抖)
   - [compress — 压缩](#compress--压缩)
   - [encrypt — 加密](#encrypt--加密)
@@ -98,19 +97,21 @@ interface Atom<T> extends EventTarget {
   has(): Promise<boolean>;
   update(updater: (prev: T | undefined) => T | Promise<T>): Promise<T>;
   getMeta(): Promise<Record<string, unknown> | undefined>;
+  peek(): T | undefined;
   dispose(): void;
 }
 ```
 
-| 方法         | 说明                                                                         |
-| ------------ | ---------------------------------------------------------------------------- |
-| `get()`      | 从 driver 读取值，经过中间件链处理。默认不缓存，启用 `cached()` 后走内存缓存 |
-| `set(value)` | 写入 driver，经过中间件链处理。成功后触发 `change` 事件                      |
-| `del()`      | 删除值及关联元数据。成功后触发 `delete` 事件                                 |
-| `has()`      | 判断值是否存在，走完整中间件链。TTL 过期的 key 返回 `false`                  |
-| `update(fn)` | 读-改-写原子操作，内部串行队列保证并发安全。支持异步 updater                 |
-| `getMeta()`  | 读取持久化元数据（TTL 过期时间、版本号等），只读，用于调试                   |
-| `dispose()`  | 销毁 atom，清理所有订阅和资源。后续操作抛出 `AtomDisposedError`              |
+| 方法         | 说明                                                                 |
+| ------------ | -------------------------------------------------------------------- |
+| `get()`      | 始终从 driver 读取，经过完整中间件链                                 |
+| `set(value)` | 写入 driver，经过中间件链处理。成功后触发 `change` 事件              |
+| `del()`      | 删除值及关联元数据。成功后触发 `delete` 事件                         |
+| `has()`      | 判断值是否存在，走完整中间件链。TTL 过期的 key 返回 `false`          |
+| `update(fn)` | 读-改-写原子操作，内部串行队列保证并发安全。支持异步 updater         |
+| `getMeta()`  | 读取持久化元数据（TTL 过期时间、版本号等），只读，用于调试           |
+| `peek()`     | 同步返回本实例最后一次成功观测到的值；未观测或已删除则为 `undefined` |
+| `dispose()`  | 销毁 atom，清理所有订阅和资源。后续操作抛出 `AtomDisposedError`      |
 
 ### Modifier
 
@@ -123,7 +124,7 @@ const a = atom<string>(
   'key',
   withDriver(driver), // 指定存储后端（支持数组，表示降级链）
   withScope(scope1, scope2), // 指定作用域，决定 key 前缀
-  withMiddleware(ttl(1000), cached()), // 中间件链（追加）
+  withMiddleware(ttl(1000), sync()), // 中间件链（追加）
   withPreMiddleware(validate(fn)), // 中间件链（前置插入）
 );
 ```
@@ -268,7 +269,6 @@ import {
   ttl,
   validate,
   versioned,
-  cached,
   debounce,
   lock,
   logger,
@@ -350,25 +350,6 @@ const prefs = atom(
 - 无 `ver` 字段的旧数据视为 v0
 - 不支持降级（高版本数据读取时抛错）
 - 回写走完整中间件链，保证加密/压缩等中间件正确处理
-
-### cached — 内存缓存
-
-```typescript
-const myCache = cached();
-const config = atom('config', withDriver(d), withMiddleware(myCache));
-
-// 第二次 get() 直接返回内存缓存，不读 driver
-await config.get();
-await config.get(); // 缓存命中
-
-// 手动清除缓存
-myCache.clear();
-```
-
-- 首次 `get()` 后缓存值到内存
-- `set()` 更新缓存，`del()` 清除缓存
-- 同 Tab 其他 atom 修改同 key 或跨 Tab 同步时自动清除缓存
-- `dispose()` 时自动清除
 
 ### debounce — 写入防抖
 
@@ -493,22 +474,10 @@ const item2 = atom(
 中间件顺序由用户负责，推荐顺序：
 
 ```
-validate → ttl → versioned → compress → encrypt → cached → sync / tabSync → logger
+validate → ttl → versioned → compress → encrypt → sync / tabSync → logger
 ```
 
-`cached()` 缓存的是**该层看到的值**：`set` 时在进入更内层中间件之前快照（因此即便 `encrypt`/`compress` 写在它后面，本地读到的仍是应用层明文）；`get`/`refresh` 未命中时则缓存内层返回后的值。
-
-**常见陷阱：**
-
-```typescript
-// ✗ 错误：cache 命中直接返回，ttl 的 after 无法检查过期
-withMiddleware(cached(), ttl(1000));
-
-// ✓ 正确：ttl 包住 cached，命中缓存时仍会检查过期
-withMiddleware(ttl(1000), cached());
-```
-
-更推荐把 `compress` / `encrypt` 写在 `cached` **前面**（外层）。这样 peer `refresh` 用 driver 字节回填缓存时，外层仍会 decrypt/decompress。`cached` 在 `encrypt` 前对「本地 set 后再 get」是安全的（明文快照），但从磁盘回填的路径用「变换包住缓存」更好推理。
+`get()` 始终走完整管线。需要同步读取本实例最后一次成功观测的值时，使用 `atom.peek()`（不是中间件）。
 
 ### 自定义中间件
 
@@ -747,7 +716,7 @@ await token.get(); // 抛出 AtomDisposedError
 ┌─────────────────────────────────────────────────┐
 │  Atom API（纯句柄）                              │  atom(), defineAtom(), batch()
 ├─────────────────────────────────────────────────┤
-│  Middleware Pipeline（洋葱模型）                  │  validate, ttl, cached, sync, ...
+│  Middleware Pipeline（洋葱模型）                  │  validate, ttl, sync, ...
 ├─────────────────────────────────────────────────┤
 │  Scope（注册表）                                  │  createScope(), key 前缀 + clear()
 ├─────────────────────────────────────────────────┤
@@ -775,7 +744,7 @@ Value 和 meta 合并为一个结构体存储，单次 I/O 读写：
 | -------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `atorage`            | 核心 API：`atom`、`defineAtom`、`createScope`、`batch`、modifier、类型、`AtomDisposedError`、`StorageError` |
 | `atorage/drivers`    | `memoryDriver`、`localStorageDriver`、`sessionStorageDriver`、`indexedDBDriver`                             |
-| `atorage/middleware` | 全部预设中间件（含 `sync`、`tabSync`、`cached`、`validate`、`ttl`、`encrypt` 等）                           |
+| `atorage/middleware` | 全部预设中间件（含 `sync`、`tabSync`、`validate`、`ttl`、`encrypt` 等）                                     |
 | `atorage/utils`      | `snapshot`、`restore`、`clearByPrefix`                                                                      |
 | `atorage/debug`      | `raw`、`inspect` — 调试工具                                                                                 |
 | `atorage/test`       | `testDriver` — driver 一致性测试                                                                            |
@@ -786,9 +755,9 @@ Value 和 meta 合并为一个结构体存储，单次 I/O 读写：
 
 所有操作返回 Promise，即使底层 driver（如 localStorage）是同步的。这保证了 API 一致性，使得切换 driver 不需要修改调用代码。代价是简单场景有微小的 await 开销。
 
-### 默认不缓存
+### get 不做透明缓存
 
-正确性优先。每次 `get()` 默认从 driver 真实读取，避免缓存一致性问题。需要缓存时通过 `cached()` 中间件显式启用。
+正确性优先。每次 `get()` 都从 driver 经中间件真实读取。需要同步的内存视图时，在成功观测后使用实例上的 `peek()`。
 
 ### 元数据与值合并存储
 

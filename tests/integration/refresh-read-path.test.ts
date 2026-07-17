@@ -4,7 +4,6 @@ import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
 import { encrypt } from '../../src/middleware/encrypt';
 import { compress } from '../../src/middleware/compress';
-import { cached } from '../../src/middleware/cached';
 import { sync } from '../../src/middleware/sync';
 import { ttl } from '../../src/middleware/ttl';
 import { versioned } from '../../src/middleware/versioned';
@@ -41,7 +40,7 @@ describe('refresh read-path alignment', () => {
     const b = atom<string>(
       'secret',
       withDriver(driver),
-      withMiddleware(encrypt(simpleEncryptor), cached(), sync()),
+      withMiddleware(encrypt(simpleEncryptor), sync()),
     );
 
     const onChange = vi.fn();
@@ -50,6 +49,7 @@ describe('refresh read-path alignment', () => {
     await a.set('hello');
 
     expect(onChange).toHaveBeenCalledWith('hello');
+    expect(b.peek()).toBe('hello');
     await expect(b.get()).resolves.toBe('hello');
 
     a.dispose();

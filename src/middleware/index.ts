@@ -5,8 +5,6 @@ export { versioned } from './versioned';
 export type { VersionedConfig } from './versioned';
 export { logger } from './logger';
 export type { LoggerOptions } from './logger';
-export { cached } from './cached';
-export type { CachedMiddleware } from './cached';
 export { debounce } from './debounce';
 export type { DebounceMiddleware } from './debounce';
 export { lock } from './lock';
