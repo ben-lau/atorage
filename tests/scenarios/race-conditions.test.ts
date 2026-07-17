@@ -2,7 +2,6 @@ import { atom } from '../../src/atom';
 import { batch } from '../../src/batch';
 import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
-import { cached } from '../../src/middleware/cached';
 import { debounce } from '../../src/middleware/debounce';
 import { lock } from '../../src/middleware/lock';
 import { ttl } from '../../src/middleware/ttl';
@@ -387,20 +386,21 @@ describe('Scenario: race conditions and concurrency', () => {
       a.dispose();
     });
 
-    it('cached + ttl: TTL check still rejects expired data on cache hit', async () => {
+    it('ttl: expired get clears peek', async () => {
       vi.useFakeTimers();
       vi.setSystemTime(0);
 
       const driver = memoryDriver();
-      const a = atom<string>('key', withDriver(driver), withMiddleware(ttl(100), cached()));
+      const a = atom<string>('key', withDriver(driver), withMiddleware(ttl(100)));
 
       await a.set('fresh');
-      expect(await a.get()).toBe('fresh'); // warms cache
+      expect(a.peek()).toBe('fresh');
+      expect(await a.get()).toBe('fresh');
 
       vi.advanceTimersByTime(200);
 
-      // TTL should check meta.exp even on cached data
       expect(await a.get()).toBeUndefined();
+      expect(a.peek()).toBeUndefined();
 
       vi.useRealTimers();
       a.dispose();

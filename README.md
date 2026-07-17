@@ -57,7 +57,6 @@ await token.del();
   - [ttl — Time-to-Live](#ttl--time-to-live)
   - [validate — Runtime Validation](#validate--runtime-validation)
   - [versioned — Version Migration](#versioned--version-migration)
-  - [cached — In-Memory Cache](#cached--in-memory-cache)
   - [debounce — Write Debouncing](#debounce--write-debouncing)
   - [compress — Compression](#compress--compression)
   - [encrypt — Encryption](#encrypt--encryption)
@@ -96,19 +95,21 @@ interface Atom<T> extends EventTarget {
   has(): Promise<boolean>;
   update(updater: (prev: T | undefined) => T | Promise<T>): Promise<T>;
   getMeta(): Promise<Record<string, unknown> | undefined>;
+  peek(): T | undefined;
   dispose(): void;
 }
 ```
 
-| Method       | Description                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------------- |
-| `get()`      | Read from driver through the middleware chain. No caching by default; enable `cached()` for in-memory caching |
-| `set(value)` | Write to driver through the middleware chain. Dispatches `change` event on success                            |
-| `del()`      | Delete value and associated metadata. Dispatches `delete` event on success                                    |
-| `has()`      | Check if value exists. Runs through the full middleware chain — TTL-expired keys return `false`               |
-| `update(fn)` | Atomic read-modify-write. Internal serial queue ensures concurrency safety. Supports async updaters           |
-| `getMeta()`  | Read persisted metadata (TTL expiry, version number, etc.). Read-only, for debugging                          |
-| `dispose()`  | Destroy the atom, clean up all subscriptions and resources. Subsequent operations throw `AtomDisposedError`   |
+| Method       | Description                                                                                                 |
+| ------------ | ----------------------------------------------------------------------------------------------------------- |
+| `get()`      | Always read from driver through the middleware chain                                                        |
+| `set(value)` | Write to driver through the middleware chain. Dispatches `change` event on success                          |
+| `del()`      | Delete value and associated metadata. Dispatches `delete` event on success                                  |
+| `has()`      | Check if value exists. Runs through the full middleware chain — TTL-expired keys return `false`             |
+| `update(fn)` | Atomic read-modify-write. Internal serial queue ensures concurrency safety. Supports async updaters         |
+| `getMeta()`  | Read persisted metadata (TTL expiry, version number, etc.). Read-only, for debugging                        |
+| `peek()`     | Sync last-known value for this instance. No I/O, no middleware. `undefined` if never observed or deleted    |
+| `dispose()`  | Destroy the atom, clean up all subscriptions and resources. Subsequent operations throw `AtomDisposedError` |
 
 ### Modifiers
 
@@ -121,7 +122,7 @@ const a = atom<string>(
   'key',
   withDriver(driver), // Specify storage backend (arrays = degradation chain)
   withScope(scope1, scope2), // Specify scopes, determines key prefix
-  withMiddleware(ttl(1000), cached()), // Middleware chain (appended)
+  withMiddleware(ttl(1000), sync()), // Middleware chain (appended)
   withPreMiddleware(validate(fn)), // Middleware chain (prepended before base)
 );
 ```
@@ -266,7 +267,6 @@ import {
   ttl,
   validate,
   versioned,
-  cached,
   debounce,
   lock,
   logger,
@@ -348,25 +348,6 @@ const prefs = atom(
 - Legacy data without `ver` is treated as v0
 - Downgrades not supported (throws on higher version data)
 - Writeback runs through the full middleware chain, ensuring encrypt/compress etc. process correctly
-
-### cached — In-Memory Cache
-
-```typescript
-const myCache = cached();
-const config = atom('config', withDriver(d), withMiddleware(myCache));
-
-// Second get() returns from memory — no driver read
-await config.get();
-await config.get(); // cache hit
-
-// Manually clear cache
-myCache.clear();
-```
-
-- Caches value to memory after first `get()`
-- `set()` updates cache, `del()` clears cache
-- Auto-clears when other atoms modify the same key (in-tab) or via cross-tab sync
-- Auto-clears on `dispose()`
 
 ### debounce — Write Debouncing
 
@@ -491,22 +472,10 @@ const item2 = atom(
 Middleware ordering is the user's responsibility. Recommended order:
 
 ```
-validate → ttl → versioned → compress → encrypt → cached → sync / tabSync → logger
+validate → ttl → versioned → compress → encrypt → sync / tabSync → logger
 ```
 
-`cached()` stores the value **as seen at its layer**. On `set` it snapshots before inner middleware runs (so app-level plaintext is cached even if `encrypt`/`compress` sit inside). On `get`/`refresh` miss it stores the value after inner middleware returns.
-
-**Common pitfalls:**
-
-```typescript
-// ✗ Wrong: cache hit returns before ttl's after-hook — expiry never checked
-withMiddleware(cached(), ttl(1000));
-
-// ✓ Correct: ttl wraps cached so expiry still runs on cache hits
-withMiddleware(ttl(1000), cached());
-```
-
-Prefer listing `compress` / `encrypt` **before** `cached` (outer wrappers). That way decrypt/decompress still run when a peer `refresh` refills the cache with driver bytes. `cached` before `encrypt` is safe for local `get` after `set` (plaintext snapshot), but a raw refill path is easier to reason about with transforms outside.
+`get()` always reads through the full pipeline. For a synchronous in-memory view of the last successful observation, use `atom.peek()` (not middleware).
 
 ### Custom Middleware
 
@@ -769,7 +738,7 @@ Value and meta are merged into a single structure, stored with a single I/O oper
 | -------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `atorage`            | Core API: `atom`, `defineAtom`, `createScope`, `batch`, modifiers, types, `AtomDisposedError`, `StorageError` |
 | `atorage/drivers`    | `memoryDriver`, `localStorageDriver`, `sessionStorageDriver`, `indexedDBDriver`                               |
-| `atorage/middleware` | All preset middleware (including `sync`, `tabSync`, `cached`, `validate`, `ttl`, `encrypt`, …)                |
+| `atorage/middleware` | All preset middleware (including `sync`, `tabSync`, `validate`, `ttl`, `encrypt`, …)                          |
 | `atorage/utils`      | `snapshot`, `restore`, `clearByPrefix`                                                                        |
 | `atorage/debug`      | `raw`, `inspect` — debug tools                                                                                |
 | `atorage/test`       | `testDriver` — driver conformance testing                                                                     |
@@ -780,9 +749,9 @@ Value and meta are merged into a single structure, stored with a single I/O oper
 
 All operations return Promises, even when the underlying driver (e.g., localStorage) is synchronous. This ensures API consistency so that switching drivers never requires call-site changes. The trade-off is minimal `await` overhead in simple scenarios.
 
-### No Caching by Default
+### No Transparent Get Cache
 
-Correctness first. Every `get()` reads from the driver by default, avoiding cache consistency issues. Opt in to caching explicitly via the `cached()` middleware.
+Correctness first. Every `get()` reads from the driver through middleware. Use `peek()` for a synchronous last-known value on the atom instance after a successful observation.
 
 ### Merged Value + Metadata Storage
 

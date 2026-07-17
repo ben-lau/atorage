@@ -4,7 +4,6 @@ import { defineAtom } from '../../src/define-atom';
 import { withDriver, withMiddleware, withScope } from '../../src/modifiers';
 import { createScope } from '../../src/scope';
 import { memoryDriver } from '../../src/drivers/memory';
-import { cached } from '../../src/middleware/cached';
 import { AtomDisposedError } from '../../src/errors';
 import { snapshot, restore, clearByPrefix } from '../../src/utils/index';
 import { inspect } from '../../src/debug/inspect';
@@ -16,11 +15,7 @@ describe('journey: small-app workspace (scopes, batch, utils)', () => {
     const session = createScope('session');
     const prefs = createScope('prefs');
 
-    const createSession = defineAtom(() => [
-      withDriver(driver),
-      withScope(session),
-      withMiddleware(cached()),
-    ]);
+    const createSession = defineAtom(() => [withDriver(driver), withScope(session)]);
 
     const token = createSession<string>('token');
     const profile = createSession<{ name: string }>('profile');

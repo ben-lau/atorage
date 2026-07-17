@@ -2,7 +2,6 @@ import { defineAtom } from '../../src/define-atom';
 import { withDriver, withMiddleware, withScope } from '../../src/modifiers';
 import { createScope } from '../../src/scope';
 import { memoryDriver } from '../../src/drivers/memory';
-import { cached } from '../../src/middleware/cached';
 import { ttl } from '../../src/middleware/ttl';
 import { validate, ValidationError } from '../../src/middleware/validate';
 import { atom } from '../../src/atom';
@@ -28,17 +27,12 @@ describe('journey: auth session login → use → expire → logout', () => {
     const createSessionAtom = defineAtom(() => [
       withDriver(driver),
       withScope(sessionScope),
-      withMiddleware(validate(isValidToken), ttl(SESSION_TTL), cached()),
+      withMiddleware(validate(isValidToken), ttl(SESSION_TTL)),
     ]);
 
     const token = createSessionAtom<string>('token');
     // profile uses a looser validator via plain atom in same scope
-    const profile = atom<UserProfile>(
-      'profile',
-      withDriver(driver),
-      withScope(sessionScope),
-      withMiddleware(cached()),
-    );
+    const profile = atom<UserProfile>('profile', withDriver(driver), withScope(sessionScope));
     const theme = atom<string>('theme', withDriver(driver), withScope(prefsScope));
 
     // login

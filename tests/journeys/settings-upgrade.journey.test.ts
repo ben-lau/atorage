@@ -1,7 +1,6 @@
 import { atom } from '../../src/atom';
 import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
-import { cached } from '../../src/middleware/cached';
 import { validate } from '../../src/middleware/validate';
 import { versioned } from '../../src/middleware/versioned';
 
@@ -52,11 +51,15 @@ describe('journey: app upgrade settings migration', () => {
       withMiddleware(
         validate(isValidSettings),
         versioned({ current: 3, migrate: countingMigrate }),
-        cached(),
       ),
     );
 
     expect(await settings.get()).toEqual({
+      theme: 'light',
+      fontSize: 14,
+      language: 'zh-CN',
+    });
+    expect(settings.peek()).toEqual({
       theme: 'light',
       fontSize: 14,
       language: 'zh-CN',
@@ -76,7 +79,6 @@ describe('journey: app upgrade settings migration', () => {
       withMiddleware(
         validate(isValidSettings),
         versioned({ current: 3, migrate: countingMigrate }),
-        cached(),
       ),
     );
 

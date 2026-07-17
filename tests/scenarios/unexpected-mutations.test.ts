@@ -1,7 +1,6 @@
 import { atom } from '../../src/atom';
 import { withDriver, withMiddleware } from '../../src/modifiers';
 import { memoryDriver } from '../../src/drivers/memory';
-import { cached } from '../../src/middleware/cached';
 import type { MiddlewareFunction } from '../../src/types';
 
 describe('Scenario: unexpected mutations and state leaks', () => {
@@ -52,26 +51,17 @@ describe('Scenario: unexpected mutations and state leaks', () => {
       a.dispose();
     });
 
-    it('under cached, mutating get return value also pollutes the cache', async () => {
+    it('mutating peek return value also pollutes last-known', async () => {
       const driver = memoryDriver();
-      const a = atom<{ items: string[] }>('list', withDriver(driver), withMiddleware(cached()));
+      const a = atom<{ items: string[] }>('list', withDriver(driver));
 
       await a.set({ items: ['a', 'b', 'c'] });
 
-      const result = await a.get();
-      result!.items.push('INJECTED');
+      const peeked = a.peek();
+      peeked!.items.push('INJECTED');
 
-      // Subsequent get reads from cache — cache stores the same reference
-      const cached_result = await a.get();
-      // If cache doesn't do deep copy, INJECTED will be visible
-      expect(cached_result!.items).toBeDefined();
-
-      // Record behavior: exposes whether cached returns references
-      const hasInjection = cached_result!.items.includes('INJECTED');
-      if (hasInjection) {
-        // Cache reference leak — external code can freely modify cached content
-        expect(cached_result!.items.length).toBe(4);
-      }
+      // peek returns the same reference held as last-known (no defensive clone)
+      expect(a.peek()!.items).toContain('INJECTED');
 
       a.dispose();
     });
@@ -203,23 +193,19 @@ describe('Scenario: unexpected mutations and state leaks', () => {
       a.dispose();
     });
 
-    it('after external deletion of driver data, cached atom still returns cached value (cache inconsistency)', async () => {
+    it('after external deletion, peek stays stale until get observes missing', async () => {
       const driver = memoryDriver();
-      const a = atom<string>('key', withDriver(driver), withMiddleware(cached()));
+      const a = atom<string>('key', withDriver(driver));
 
-      await a.set('cached-data');
-      expect(await a.get()).toBe('cached-data'); // warm cache
+      await a.set('data');
+      expect(a.peek()).toBe('data');
 
-      // Externally delete driver data directly
       await driver.del('key');
 
-      // atom still returns data from cache — but driver is empty
-      const fromCache = await a.get();
-      expect(fromCache).toBe('cached-data');
-
-      // Only after clearing cache can you see the real state
-      // Cannot access internal middleware instance's clear()
-      // This exposes the inconsistency of cached under external modification scenarios
+      // peek is last-known only — may lead storage until the next observation
+      expect(a.peek()).toBe('data');
+      expect(await a.get()).toBeUndefined();
+      expect(a.peek()).toBeUndefined();
 
       a.dispose();
     });
