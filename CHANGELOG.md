@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.4](https://github.com/ben-lau/atorage/compare/v0.0.3...v0.0.4) (2026-07-17)
+
+
+### Features
+
+* **core:** add peek() and remove cached middleware ([69ec037](https://github.com/ben-lau/atorage/commit/69ec037c167297a048886cfced73caede700babb))
+
+
+### Code Refactoring
+
+* **core:** make atoms independent and opt into sync via middleware ([22b53ee](https://github.com/ben-lau/atorage/commit/22b53ee1c03e531a7ebd624759ad6e212234f7cd))
+
 ## [0.0.3](https://github.com/ben-lau/atorage/compare/v0.0.2...v0.0.3) (2026-07-15)
 
 
