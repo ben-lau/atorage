@@ -1,6 +1,6 @@
 {
   "name": "atorage",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Type-safe, middleware-composable storage layer for localStorage, sessionStorage, and IndexedDB",
   "type": "module",
   "main": "./dist/index.cjs",
